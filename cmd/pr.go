@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/hsh-719/bit/internal/chain"
-	"github.com/hsh-719/bit/internal/config"
-	"github.com/hsh-719/bit/internal/git"
+	"github.com/opendasom/bit/internal/app"
+	"github.com/opendasom/bit/internal/chain"
+	"github.com/opendasom/bit/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -35,11 +35,6 @@ var prCreateCmd = &cobra.Command{
 			return fmt.Errorf("remote '%s' 를 찾을 수 없습니다", remoteName)
 		}
 
-		sourceBranch, err := git.CurrentBranch(".")
-		if err != nil {
-			return fmt.Errorf("현재 브랜치 조회 실패: %w", err)
-		}
-
 		chainClient, err := chain.NewClient(cfg.RPCURL, cfg.ContractAddress, cfg.PrivateKey)
 		if err != nil {
 			return fmt.Errorf("체인 연결 실패: %w", err)
@@ -48,44 +43,9 @@ var prCreateCmd = &cobra.Command{
 		sourceRepoID := new(big.Int).SetUint64(cfg.RepoID)
 		targetRepoID := new(big.Int).SetUint64(remote.RepoID)
 
-		sourceHistoryLen, err := chainClient.GetBranchHistoryLength(sourceRepoID, sourceBranch)
-		if err != nil {
-			return fmt.Errorf("source 브랜치 히스토리 조회 실패: %w", err)
-		}
-		if sourceHistoryLen.Sign() == 0 {
-			return fmt.Errorf("현재 브랜치 '%s' 에 커밋이 없습니다", sourceBranch)
-		}
-
-		targetHead, err := chainClient.GetBranchCommit(targetRepoID, targetBranch)
-		if err != nil {
-			return fmt.Errorf("target 브랜치 헤드 조회 실패: %w", err)
-		}
-
-		sourceRecords, err := loadBranchRecords(chainClient, sourceRepoID, sourceBranch, sourceHistoryLen.Int64())
+		prID, sourceBranch, err := app.PRCreate(chainClient, ".", sourceRepoID, targetRepoID, targetBranch)
 		if err != nil {
 			return err
-		}
-
-		if !chain.IsZeroBytes20(targetHead) {
-			targetHeadHex := chain.Bytes20ToGitHash(targetHead)
-			targetIndex := -1
-			for i, record := range sourceRecords {
-				if chain.Bytes20ToGitHash(record.CommitHash) == targetHeadHex {
-					targetIndex = i
-					break
-				}
-			}
-			if targetIndex == -1 {
-				return fmt.Errorf("target 브랜치 '%s' 가 source 히스토리에 없습니다. upstream이 먼저 앞서 나갔습니다", targetBranch)
-			}
-			if targetIndex >= len(sourceRecords)-1 {
-				return fmt.Errorf("새로 추가된 커밋이 없습니다. '%s' 는 이미 최신입니다", sourceBranch)
-			}
-		}
-
-		prID, err := chainClient.CreatePullRequest(targetRepoID, targetBranch, sourceRepoID, sourceBranch)
-		if err != nil {
-			return fmt.Errorf("PR 생성 실패: %w", err)
 		}
 
 		fmt.Printf("PR 생성 완료: #%s\n", prID.String())

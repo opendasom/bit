@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hsh-719/bit/internal/config"
+	"github.com/opendasom/bit/internal/config"
 	"github.com/spf13/cobra"
 )
 

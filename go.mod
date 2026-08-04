@@ -1,4 +1,4 @@
-module github.com/hsh-719/bit
+module github.com/opendasom/bit
 
 go 1.25.0
 

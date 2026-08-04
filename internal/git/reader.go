@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	gogit "github.com/go-git/go-git/v5"
-	"github.com/hsh-719/bit/internal/manifest"
+	"github.com/opendasom/bit/internal/manifest"
 )
 
 // HeadInfo는 로컬 .git에서 읽은 현재 브랜치와 커밋 정보를 담는다.

@@ -6,12 +6,10 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/hsh-719/bit/internal/chain"
-	compactcid "github.com/hsh-719/bit/internal/cid"
-	"github.com/hsh-719/bit/internal/config"
-	"github.com/hsh-719/bit/internal/git"
-	"github.com/hsh-719/bit/internal/ipfs"
-	"github.com/hsh-719/bit/internal/manifest"
+	"github.com/opendasom/bit/internal/app"
+	"github.com/opendasom/bit/internal/chain"
+	"github.com/opendasom/bit/internal/config"
+	"github.com/opendasom/bit/internal/ipfs"
 	"github.com/spf13/cobra"
 )
 
@@ -73,94 +71,12 @@ var forkCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("체인 연결 실패: %w", err)
 		}
+		ipfsClient := ipfs.NewClient(ipfsURL)
 
-		// 5. source 브랜치 히스토리 조회
-		srcRepoID := new(big.Int).SetUint64(sourceRepoID)
-		historyLen, err := chainClient.GetBranchHistoryLength(srcRepoID, branch)
-		if err != nil {
-			return fmt.Errorf("source 브랜치 히스토리 조회 실패: %w", err)
-		}
-		if historyLen.Sign() == 0 {
-			return fmt.Errorf("source 브랜치 '%s'에 커밋이 없습니다", branch)
-		}
-		records, err := loadBranchRecords(chainClient, srcRepoID, branch, historyLen.Int64())
+		// 5~7. source 히스토리 조회 → fork 저장소 생성 → 커밋 복원 및 기록
+		forkRepoID, err := app.Fork(chainClient, ipfsClient, ".", new(big.Int).SetUint64(sourceRepoID), branch)
 		if err != nil {
 			return err
-		}
-		fmt.Printf("source 커밋 %d개 발견\n", len(records))
-
-		// 6. B 저장소 생성 (체인에 새 repoId 발급)
-		fmt.Println("fork 저장소를 체인에 생성 중...")
-		forkRepoID, err := chainClient.CreateRepo("")
-		if err != nil {
-			return fmt.Errorf("fork 저장소 생성 실패: %w", err)
-		}
-		fmt.Printf("fork 저장소 생성 완료 (repoId: %s)\n", forkRepoID.String())
-
-		// 7. 각 커밋: IPFS 다운로드 → 로컬 git 복원 → B 체인에 기록
-		ipfsClient := ipfs.NewClient(ipfsURL)
-		expectedOldCommit := [20]byte{}
-
-		for i, record := range records {
-			manifestCID := compactcid.CIDV0FromDigest(record.ManifestDigest)
-			diffCID := compactcid.CIDV0FromDigest(record.DiffDigest)
-
-			// manifest 다운로드
-			manifestData, err := ipfsClient.Download(manifestCID)
-			if err != nil {
-				return fmt.Errorf("manifest 다운로드 실패 (커밋 %d, %s): %w", i+1, manifestCID, err)
-			}
-			m, err := manifest.Decode(manifestData)
-			if err != nil {
-				return fmt.Errorf("manifest 파싱 실패 (%s): %w", manifestCID, err)
-			}
-
-			// 검증
-			expectedCommit := chain.Bytes20ToGitHash(record.CommitHash)
-			if m.GitCommit != expectedCommit {
-				return fmt.Errorf("manifest commit mismatch: got %s, want %s", m.GitCommit, expectedCommit)
-			}
-			if m.DiffCID != diffCID {
-				return fmt.Errorf("manifest diff CID mismatch for %s", expectedCommit)
-			}
-
-			// diff 다운로드
-			diff, err := ipfsClient.Download(m.DiffCID)
-			if err != nil {
-				return fmt.Errorf("diff 다운로드 실패 (%s): %w", m.DiffCID, err)
-			}
-
-			// 로컬 git에 커밋 복원
-			if err := git.ApplyCommitDiff(".", m, diff); err != nil {
-				return fmt.Errorf("commit diff 적용 실패 (%s): %w", expectedCommit, err)
-			}
-
-			// parents 변환 (manifest.ParentCommits → [][20]byte)
-			parentHashes := make([][20]byte, 0, len(m.ParentCommits))
-			for _, parent := range m.ParentCommits {
-				h, err := chain.GitHashToBytes20(parent)
-				if err != nil {
-					return fmt.Errorf("parent 해시 변환 실패 (%s): %w", parent, err)
-				}
-				parentHashes = append(parentHashes, h)
-			}
-
-			// B 체인에 기록 (IPFS 재업로드 없이 기존 digest 그대로 사용)
-			if err := chainClient.RecordCommit(
-				forkRepoID,
-				branch,
-				expectedOldCommit,
-				record.CommitHash,
-				record.TreeHash,
-				parentHashes,
-				record.ManifestDigest,
-				record.DiffDigest,
-			); err != nil {
-				return fmt.Errorf("체인 커밋 기록 실패 (커밋 %d, %s): %w", i+1, expectedCommit, err)
-			}
-
-			expectedOldCommit = record.CommitHash
-			fmt.Printf("커밋 복원 완료 (%d/%d): %s\n", i+1, len(records), expectedCommit[:8])
 		}
 
 		// 8. .bit/config.json 저장
