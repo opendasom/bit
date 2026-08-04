@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {BitRegistry} from "../src/BitRegistry.sol";
+import {BitRegistryTypes} from "../src/BitRegistryTypes.sol";
 
 contract RegistryActor {
     BitRegistry private immutable registry;
@@ -76,7 +77,7 @@ contract BitRegistryPullRequestTest {
         (uint256 targetRepoId, uint256 sourceRepoId) = _seedTargetAndSource();
 
         uint256 prId = sourceOwner.createPullRequest(targetRepoId, MAIN, sourceRepoId, MAIN);
-        BitRegistry.PullRequest memory pr = registry.getPullRequest(prId);
+        BitRegistryTypes.PullRequest memory pr = registry.getPullRequest(prId);
 
         require(pr.id == prId, "wrong pr id");
         require(pr.targetRepoId == targetRepoId, "wrong target repo");
@@ -84,7 +85,7 @@ contract BitRegistryPullRequestTest {
         require(pr.baseCommit == B, "wrong base");
         require(pr.sourceHeadCommit == D, "wrong source head");
         require(pr.author == address(sourceOwner), "wrong author");
-        require(pr.status == BitRegistry.PullRequestStatus.Open, "wrong status");
+        require(pr.status == BitRegistryTypes.PullRequestStatus.Open, "wrong status");
         require(registry.getRepoPullRequestCount(targetRepoId) == 1, "wrong pr count");
         require(registry.getRepoPullRequestAt(targetRepoId, 0) == prId, "wrong pr index");
     }
@@ -108,8 +109,8 @@ contract BitRegistryPullRequestTest {
         require(registry.getCommitParentCount(targetRepoId, C) == 1, "wrong copied parent count");
         require(registry.getCommitParentAt(targetRepoId, C, 0) == B, "wrong copied parent");
 
-        BitRegistry.PullRequest memory pr = registry.getPullRequest(prId);
-        require(pr.status == BitRegistry.PullRequestStatus.Approved, "pr was not approved");
+        BitRegistryTypes.PullRequest memory pr = registry.getPullRequest(prId);
+        require(pr.status == BitRegistryTypes.PullRequestStatus.Approved, "pr was not approved");
     }
 
     function testApprovePullRequestRevertsWhenTargetMoved() public {
@@ -147,13 +148,13 @@ contract BitRegistryPullRequestTest {
         uint256 rejectedPrId = sourceOwner.createPullRequest(targetRepoId, MAIN, sourceRepoId, MAIN);
         targetOwner.rejectPullRequest(rejectedPrId);
         require(
-            registry.getPullRequest(rejectedPrId).status == BitRegistry.PullRequestStatus.Rejected,
+            registry.getPullRequest(rejectedPrId).status == BitRegistryTypes.PullRequestStatus.Rejected,
             "pr was not rejected"
         );
 
         uint256 closedPrId = sourceOwner.createPullRequest(targetRepoId, MAIN, sourceRepoId, MAIN);
         sourceOwner.closePullRequest(closedPrId);
-        require(registry.getPullRequest(closedPrId).status == BitRegistry.PullRequestStatus.Closed, "pr was not closed");
+        require(registry.getPullRequest(closedPrId).status == BitRegistryTypes.PullRequestStatus.Closed, "pr was not closed");
     }
 
     function _seedTargetAndSource() private returns (uint256 targetRepoId, uint256 sourceRepoId) {

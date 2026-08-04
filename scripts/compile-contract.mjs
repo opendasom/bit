@@ -3,17 +3,20 @@ import path from "node:path";
 import solc from "solc";
 
 const root = process.cwd();
-const sourcePath = path.join(root, "contracts/src/BitRegistry.sol");
+const srcDir = path.join(root, "contracts/src");
 const outDir = path.join(root, "internal/chain/artifacts");
 const outPath = path.join(outDir, "BitRegistry.json");
 
+const sources = Object.fromEntries(
+  fs
+    .readdirSync(srcDir)
+    .filter((name) => name.endsWith(".sol"))
+    .map((name) => [name, { content: fs.readFileSync(path.join(srcDir, name), "utf8") }])
+);
+
 const input = {
   language: "Solidity",
-  sources: {
-    "BitRegistry.sol": {
-      content: fs.readFileSync(sourcePath, "utf8")
-    }
-  },
+  sources,
   settings: {
     evmVersion: "paris",
     viaIR: true,
