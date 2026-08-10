@@ -563,7 +563,11 @@ function App() {
         functionName,
         args: [prId],
       });
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+      if (receipt.status !== "success") {
+        setError("트랜잭션이 revert 되었습니다. 대상 브랜치가 이동했거나 권한이 없는지 확인하세요.");
+        return;
+      }
       await loadRepoDetail(selectedRepoId);
     } catch (err) {
       setError(errorMessage(err));
@@ -627,7 +631,11 @@ function App() {
           stringToHex(newPrDescription),
         ],
       });
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+      if (receipt.status !== "success") {
+        setError("PR 생성 트랜잭션이 revert 되었습니다. 대상 브랜치가 앞서 나갔거나 새 커밋이 없는지 확인하세요.");
+        return;
+      }
       setShowCreatePr(false);
       setNewPrDescription("");
       await loadRepoDetail(selectedRepoId);
