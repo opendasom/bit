@@ -400,7 +400,7 @@ function App() {
         prIds.add(prId.toString());
       }
 
-      const latestBlock = await publicClient.getBlockNumber();
+      const latestBlock = await publicClient.getBlockNumber({ cacheTime: 0 });
       for (let fromBlock = 0n; fromBlock <= latestBlock; fromBlock += LOG_BLOCK_RANGE) {
         const toBlock = fromBlock + LOG_BLOCK_RANGE - 1n > latestBlock ? latestBlock : fromBlock + LOG_BLOCK_RANGE - 1n;
         const logs = (await publicClient.getContractEvents({
@@ -464,7 +464,7 @@ function App() {
   async function loadRepoBranches(repoId: bigint, repoLookup: RepoSummary[] = repos, defaultBranch = "main") {
     try {
       const repo = repoLookup.find((item) => item.id === repoId) ?? selectedRepo;
-      const latestBlock = await publicClient.getBlockNumber();
+      const latestBlock = await publicClient.getBlockNumber({ cacheTime: 0 });
       const logs: CommitRecordedLog[] = [];
       for (let fromBlock = 0n; fromBlock <= latestBlock; fromBlock += LOG_BLOCK_RANGE) {
         const toBlock = fromBlock + LOG_BLOCK_RANGE - 1n > latestBlock ? latestBlock : fromBlock + LOG_BLOCK_RANGE - 1n;
