@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/hsh-719/bit/cmd"
+	"github.com/opendasom/bit/cmd"
 )
 
 func main() {

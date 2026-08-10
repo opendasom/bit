@@ -1,13 +1,13 @@
-package cmd
+package app
 
 import (
 	"fmt"
 	"math/big"
 
-	"github.com/hsh-719/bit/internal/chain"
+	"github.com/opendasom/bit/internal/chain"
 )
 
-func loadBranchRecords(chainClient *chain.Client, repoID *big.Int, branch string, total int64) ([]chain.BranchCommitRecord, error) {
+func loadBranchRecords(chainClient ChainClient, repoID *big.Int, branch string, total int64) ([]chain.BranchCommitRecord, error) {
 	const pageSize int64 = 100
 	records := make([]chain.BranchCommitRecord, 0, total)
 	for start := int64(0); start < total; start += pageSize {

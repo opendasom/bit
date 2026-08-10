@@ -5,10 +5,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hsh-719/bit/internal/chain"
-	"github.com/hsh-719/bit/internal/config"
-	"github.com/hsh-719/bit/internal/ipfs"
-	"github.com/hsh-719/bit/internal/repo"
+	"github.com/opendasom/bit/internal/app"
+	"github.com/opendasom/bit/internal/chain"
+	"github.com/opendasom/bit/internal/config"
+	"github.com/opendasom/bit/internal/ipfs"
+	"github.com/opendasom/bit/internal/repo"
 	"github.com/spf13/cobra"
 )
 
@@ -41,32 +42,21 @@ var initCmd = &cobra.Command{
 			Description:   repoDescription,
 			DefaultBranch: defaultBranch,
 		}
-		metadataData, err := repo.EncodeMetadata(metadata)
-		if err != nil {
-			return fmt.Errorf("repo metadata 생성 실패: %w", err)
-		}
-		metadataCID, err := ipfs.NewClient(ipfsURL).Upload(metadataData)
-		if err != nil {
-			return fmt.Errorf("repo metadata IPFS 업로드 실패: %w", err)
-		}
 
-		// 2. 체인 연결 확인 및 저장소 등록 → repoId 발급
 		chainClient, err := chain.NewClient(rpcURL, contractAddress, privateKey)
 		if err != nil {
 			return fmt.Errorf("체인 연결 실패: %w", err)
 		}
+		ipfsClient := ipfs.NewClient(ipfsURL)
 
-		repoID, err := chainClient.CreateRepo(metadataCID)
+		repoID, metadataCID, err := app.Init(chainClient, ipfsClient, metadata)
 		if err != nil {
-			return fmt.Errorf("저장소 생성 실패: %w", err)
-		}
-		if repoID == nil {
-			return fmt.Errorf("저장소 생성 실패: repoId를 확인할 수 없습니다")
+			return err
 		}
 		fmt.Printf("체인 저장소 생성 완료 (repoId: %s)\n", repoID.String())
 		fmt.Printf("repo metadata 등록 완료: %s\n", metadataCID)
 
-		// 3. .bit/config.json 생성
+		// .bit/config.json 생성
 		cfg := &config.Config{
 			RPCURL:          rpcURL,
 			ContractAddress: contractAddress,

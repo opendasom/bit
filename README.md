@@ -252,14 +252,13 @@ bit/
 ├── main.go
 ├── cmd/
 │   ├── root.go       # 루트 커맨드, 서브커맨드 등록
-│   ├── common.go     # 공용 함수 (loadBranchRecords)
 │   ├── init.go       # bit init
 │   ├── remote.go     # bit remote add
 │   ├── push.go       # bit push
 │   ├── pull.go       # bit pull
-│   ├── fork.go       # bit fork
-│   └── pr.go         # bit pr (제거됨 — PR은 웹에서 처리)
+│   └── fork.go       # bit fork (pr 명령은 제거됨 — PR은 웹에서 처리)
 ├── internal/
+│   ├── app/          # 명령 실행 로직 (cmd는 얇은 래퍼)
 │   ├── chain/        # BitRegistry 컨트랙트 연동 (go-ethereum)
 │   ├── git/          # .git 읽기/쓰기 (go-git + exec git)
 │   ├── ipfs/         # IPFS HTTP API 클라이언트
