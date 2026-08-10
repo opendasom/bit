@@ -139,17 +139,20 @@ fork 완료 후 자동으로 설정됩니다:
 
 이후 새 커밋을 만들고 `bit push origin`으로 내 fork에 push할 수 있습니다.
 
-### 5-1. PR 생성
+### 5-1. PR 생성 및 관리 (웹)
 
-fork에서 upstream으로 변경 사항을 올립니다. 현재 브랜치의 선형 커밋만 PR로 보냅니다.
+PR 생성/승인/거부/닫기는 웹 explorer에서 처리합니다 (GitHub 방식의 역할 분담: CLI는 push/pull/fork 같은 로컬 작업만 담당).
 
-```bash
-bit pr create upstream main
-```
+1. fork 저장소에 새 커밋을 만들고 `bit push origin`으로 push합니다.
+2. 웹에서 **Connect MetaMask** 후 해당 저장소의 **Pull Requests** 탭을 엽니다.
+3. **New pull request** 버튼으로 대상 저장소/브랜치, 소스 브랜치, 설명을 입력하고 제출합니다.
+4. 대상 저장소의 Maintainer는 웹에서 **Approve**(fast-forward 반영) / **Reject**할 수 있고, 작성자 또는 Maintainer는 **Close**할 수 있습니다.
 
 - target 브랜치가 fork 시점 이후 먼저 앞서 나갔다면 생성이 거절됩니다.
 - 현재 브랜치에 새 커밋이 없으면 PR 생성이 거절됩니다.
 - 실제 반영은 `approve` 시점에 다시 검증됩니다.
+
+> **주의**: PR 설명은 체인에 저장되므로 `createPullRequest` 시그니처가 변경되었습니다. 웹에서 PR 기능을 쓰려면 BitRegistry를 새로 배포한 뒤 웹의 contract 주소(`web/src/main.tsx`의 `defaultContract`)를 갱신해야 합니다.
 
 ### 6. 웹 explorer
 
@@ -169,6 +172,7 @@ npm run web:dev
 
 웹은 공개 설정값을 코드에 하드코딩합니다. private key는 넣지 않습니다.
 웹은 IPFS API를 사용하지 않고, 읽기용 gateway만 사용합니다.
+체인에 쓰는 트랜잭션(PR 생성/승인/거부/닫기)은 MetaMask로 서명합니다.
 
 웹 화면은 커밋 메시지, 작성자, 작성일, 온체인 기록자, 온체인 기록 시간, 부모 커밋만 표시합니다. diff 내용은 표시하지 않습니다.
 다만 현재 diff CID는 온체인/IPFS에 공개되어 있으므로, 이는 UI 제한입니다. 코드 diff 자체를 비공개로 만들려면 diff 암호화와 권한별 복호화 키 관리가 추가로 필요합니다.
@@ -233,7 +237,7 @@ bit fork <bitURL> [--rpc <url>] [--contract <addr>] [--key <key>] [--ipfs <url>]
 | Role | 권한 |
 |------|------|
 | Owner | setRole로 다른 사용자 역할 지정 |
-| Maintainer | push(recordCommit), PR 승인/거부 |
+| Maintainer | push(recordCommit), PR 승인/거부 (웹에서 처리) |
 | Contributor | 역할 없음 (현재 미사용) |
 | None | 조회만 가능 |
 
@@ -254,7 +258,7 @@ bit/
 │   ├── push.go       # bit push
 │   ├── pull.go       # bit pull
 │   ├── fork.go       # bit fork
-│   └── pr.go         # bit pr (WIP)
+│   └── pr.go         # bit pr (제거됨 — PR은 웹에서 처리)
 ├── internal/
 │   ├── chain/        # BitRegistry 컨트랙트 연동 (go-ethereum)
 │   ├── git/          # .git 읽기/쓰기 (go-git + exec git)

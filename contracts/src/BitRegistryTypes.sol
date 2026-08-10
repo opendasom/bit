@@ -52,5 +52,6 @@ abstract contract BitRegistryTypes {
         PullRequestStatus status;
         uint256 createdAt;
         uint256 updatedAt;
+        bytes description;
     }
 }

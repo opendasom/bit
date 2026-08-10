@@ -34,9 +34,10 @@ contract RegistryActor {
         uint256 targetRepoId,
         bytes32 targetBranch,
         uint256 sourceRepoId,
-        bytes32 sourceBranch
+        bytes32 sourceBranch,
+        bytes calldata description
     ) external returns (uint256) {
-        return registry.createPullRequest(targetRepoId, targetBranch, sourceRepoId, sourceBranch);
+        return registry.createPullRequest(targetRepoId, targetBranch, sourceRepoId, sourceBranch, description);
     }
 
     function approvePullRequest(uint256 prId) external {
@@ -76,7 +77,7 @@ contract BitRegistryPullRequestTest {
     function testCreatePullRequestStoresSnapshot() public {
         (uint256 targetRepoId, uint256 sourceRepoId) = _seedTargetAndSource();
 
-        uint256 prId = sourceOwner.createPullRequest(targetRepoId, MAIN, sourceRepoId, MAIN);
+        uint256 prId = sourceOwner.createPullRequest(targetRepoId, MAIN, sourceRepoId, MAIN, "adds feature X");
         BitRegistryTypes.PullRequest memory pr = registry.getPullRequest(prId);
 
         require(pr.id == prId, "wrong pr id");
@@ -86,13 +87,23 @@ contract BitRegistryPullRequestTest {
         require(pr.sourceHeadCommit == D, "wrong source head");
         require(pr.author == address(sourceOwner), "wrong author");
         require(pr.status == BitRegistryTypes.PullRequestStatus.Open, "wrong status");
+        require(keccak256(pr.description) == keccak256("adds feature X"), "wrong description");
         require(registry.getRepoPullRequestCount(targetRepoId) == 1, "wrong pr count");
         require(registry.getRepoPullRequestAt(targetRepoId, 0) == prId, "wrong pr index");
     }
 
+    function testCreatePullRequestRevertsWhenDescriptionTooLong() public {
+        (uint256 targetRepoId, uint256 sourceRepoId) = _seedTargetAndSource();
+
+        bytes memory long = new bytes(2049);
+        try sourceOwner.createPullRequest(targetRepoId, MAIN, sourceRepoId, MAIN, long) {
+            revert("expected description too long revert");
+        } catch {}
+    }
+
     function testApprovePullRequestFastForwardsTargetBranchAndCopiesMetadata() public {
         (uint256 targetRepoId, uint256 sourceRepoId) = _seedTargetAndSource();
-        uint256 prId = sourceOwner.createPullRequest(targetRepoId, MAIN, sourceRepoId, MAIN);
+        uint256 prId = sourceOwner.createPullRequest(targetRepoId, MAIN, sourceRepoId, MAIN, "");
 
         sourceOwner.recordCommit(sourceRepoId, MAIN, D, E, E, _parents(D), _digest(E, 1), _digest(E, 2));
         targetOwner.approvePullRequest(prId);
@@ -115,7 +126,7 @@ contract BitRegistryPullRequestTest {
 
     function testApprovePullRequestRevertsWhenTargetMoved() public {
         (uint256 targetRepoId, uint256 sourceRepoId) = _seedTargetAndSource();
-        uint256 prId = sourceOwner.createPullRequest(targetRepoId, MAIN, sourceRepoId, MAIN);
+        uint256 prId = sourceOwner.createPullRequest(targetRepoId, MAIN, sourceRepoId, MAIN, "");
         targetOwner.recordCommit(targetRepoId, MAIN, B, E, E, _parents(B), _digest(E, 1), _digest(E, 2));
 
         try targetOwner.approvePullRequest(prId) {
@@ -125,7 +136,7 @@ contract BitRegistryPullRequestTest {
 
     function testApprovePullRequestRequiresMaintainer() public {
         (uint256 targetRepoId, uint256 sourceRepoId) = _seedTargetAndSource();
-        uint256 prId = sourceOwner.createPullRequest(targetRepoId, MAIN, sourceRepoId, MAIN);
+        uint256 prId = sourceOwner.createPullRequest(targetRepoId, MAIN, sourceRepoId, MAIN, "");
 
         try stranger.approvePullRequest(prId) {
             revert("expected maintainer revert");
@@ -138,21 +149,21 @@ contract BitRegistryPullRequestTest {
         _record(targetOwner, targetRepoId, A, bytes20(0));
         _record(sourceOwner, sourceRepoId, C, bytes20(0));
 
-        try sourceOwner.createPullRequest(targetRepoId, MAIN, sourceRepoId, MAIN) {
+        try sourceOwner.createPullRequest(targetRepoId, MAIN, sourceRepoId, MAIN, "") {
             revert("expected base history revert");
         } catch {}
     }
 
     function testRejectAndClosePullRequest() public {
         (uint256 targetRepoId, uint256 sourceRepoId) = _seedTargetAndSource();
-        uint256 rejectedPrId = sourceOwner.createPullRequest(targetRepoId, MAIN, sourceRepoId, MAIN);
+        uint256 rejectedPrId = sourceOwner.createPullRequest(targetRepoId, MAIN, sourceRepoId, MAIN, "");
         targetOwner.rejectPullRequest(rejectedPrId);
         require(
             registry.getPullRequest(rejectedPrId).status == BitRegistryTypes.PullRequestStatus.Rejected,
             "pr was not rejected"
         );
 
-        uint256 closedPrId = sourceOwner.createPullRequest(targetRepoId, MAIN, sourceRepoId, MAIN);
+        uint256 closedPrId = sourceOwner.createPullRequest(targetRepoId, MAIN, sourceRepoId, MAIN, "");
         sourceOwner.closePullRequest(closedPrId);
         require(registry.getPullRequest(closedPrId).status == BitRegistryTypes.PullRequestStatus.Closed, "pr was not closed");
     }

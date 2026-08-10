@@ -23,4 +23,5 @@ abstract contract BitRegistryErrors {
     error SourceHeadNotFound();
     error UnauthorizedPullRequestAction();
     error MergeCommitNotSupported();
+    error DescriptionTooLong();
 }
