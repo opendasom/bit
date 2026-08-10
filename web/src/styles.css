@@ -260,6 +260,7 @@ button:disabled {
   display: grid;
   place-items: center;
   position: relative;
+  overflow: hidden;
 }
 
 .heroVisual::before {
@@ -1028,6 +1029,7 @@ input:focus {
 .detailNav {
   display: grid;
   align-content: start;
+  align-self: start;
   gap: 10px;
   position: sticky;
   top: 88px;
