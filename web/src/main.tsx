@@ -12,7 +12,7 @@ import {
   type Address,
   type Hex,
 } from "viem";
-import { sepolia } from "viem/chains";
+import { foundry, sepolia } from "viem/chains";
 import bitRegistryArtifact from "../../internal/chain/artifacts/BitRegistry.json";
 import "./styles.css";
 
@@ -104,9 +104,10 @@ declare global {
 }
 
 const abi = bitRegistryArtifact.abi;
-const defaultRpcURL = readStoredValue("bit.rpcURL") ?? "https://ethereum-sepolia-rpc.publicnode.com";
-const defaultContract = readStoredValue("bit.contract") ?? "0x34B9D83E03E2E7BF646E2452E0620E2F39cDbeE3";
-const defaultGateway = readStoredValue("bit.ipfsGateway") ?? "https://ipfs.sugang.click/ipfs";
+const configuredChain = Number(import.meta.env.VITE_BIT_CHAIN_ID ?? sepolia.id) === foundry.id ? foundry : sepolia;
+const defaultRpcURL = import.meta.env.VITE_BIT_RPC_URL ?? readStoredValue("bit.rpcURL") ?? "https://ethereum-sepolia-rpc.publicnode.com";
+const defaultContract = import.meta.env.VITE_BIT_CONTRACT ?? readStoredValue("bit.contract") ?? "0x34B9D83E03E2E7BF646E2452E0620E2F39cDbeE3";
+const defaultGateway = import.meta.env.VITE_BIT_IPFS_GATEWAY ?? readStoredValue("bit.ipfsGateway") ?? "https://ipfs.sugang.click/ipfs";
 const defaultIpfsAPI = "http://127.0.0.1:5001";
 const APP_VERSION = "1.1.0";
 const LOG_BLOCK_RANGE = 50_000n;
@@ -547,14 +548,14 @@ function App() {
     setError("");
     try {
       const chainId = (await window.ethereum.request({ method: "eth_chainId" })) as string;
-      if (Number.parseInt(chainId, 16) !== sepolia.id) {
-        setError("MetaMask network를 Sepolia로 변경하세요.");
+      if (Number.parseInt(chainId, 16) !== configuredChain.id) {
+        setError(`MetaMask network를 ${configuredChain.name}로 변경하세요.`);
         return;
       }
       const address = parseAddress(contractAddress);
       const walletClient = createWalletClient({
         account: walletAddress,
-        chain: sepolia,
+        chain: configuredChain,
         transport: custom(window.ethereum),
       });
       const txHash = await walletClient.writeContract({
@@ -609,14 +610,14 @@ function App() {
     setError("");
     try {
       const chainId = (await window.ethereum.request({ method: "eth_chainId" })) as string;
-      if (Number.parseInt(chainId, 16) !== sepolia.id) {
-        setError("MetaMask network를 Sepolia로 변경하세요.");
+      if (Number.parseInt(chainId, 16) !== configuredChain.id) {
+        setError(`MetaMask network를 ${configuredChain.name}로 변경하세요.`);
         return;
       }
       const address = parseAddress(contractAddress);
       const walletClient = createWalletClient({
         account: walletAddress,
-        chain: sepolia,
+        chain: configuredChain,
         transport: custom(window.ethereum),
       });
       const txHash = await walletClient.writeContract({
