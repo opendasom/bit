@@ -1,4 +1,6 @@
 :root {
+  --content-width: 1180px;
+  --page-gutter: 24px;
   color: #eff3ef;
   background:
     radial-gradient(circle at top left, rgba(124, 211, 156, 0.12), transparent 24%),
@@ -192,7 +194,13 @@ button:disabled {
 .connectBand,
 .projectsBand,
 .detailBand {
-  padding: 28px 24px;
+  padding: 28px var(--page-gutter);
+}
+
+.heroBand,
+.projectsBand {
+  width: min(100%, calc(var(--content-width) + (var(--page-gutter) * 2)));
+  margin-inline: auto;
 }
 
 .heroBand {
@@ -428,7 +436,7 @@ button:disabled {
 
 .workflowBand,
 .protocolBand {
-  padding: 100px 24px;
+  padding: 100px var(--page-gutter);
 }
 
 .workflowBand {
@@ -456,7 +464,7 @@ button:disabled {
 .protocolBand > * {
   position: relative;
   z-index: 1;
-  width: min(1180px, 100%);
+  width: min(var(--content-width), 100%);
   margin-inline: auto;
 }
 
@@ -970,6 +978,10 @@ input:focus {
 }
 
 @media (max-width: 760px) {
+  :root {
+    --page-gutter: 16px;
+  }
+
   .prFormGrid {
     grid-template-columns: 1fr;
   }
@@ -1436,12 +1448,12 @@ input:focus {
   margin-bottom: 16px;
 }
 
-.detailHeaderActions {
+.detailPrimaryAction {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
+  margin: 10px 0 18px;
+  padding: 2px 0;
 }
 
 .detailHeader h2 {
@@ -1456,7 +1468,7 @@ input:focus {
   color: rgba(239, 243, 239, 0.62);
 }
 
-.copyButton {
+.forkButton {
   min-width: 180px;
   min-height: 44px;
 }
@@ -1547,7 +1559,7 @@ input:focus {
 
   .workflowBand,
   .protocolBand {
-    padding: 70px 16px;
+    padding: 70px var(--page-gutter);
   }
 
   .workflowShell {
@@ -1629,11 +1641,7 @@ input:focus {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .detailHeaderActions {
-    justify-content: flex-start;
-  }
-
-  .copyButton {
-    width: 100%;
+  .detailPrimaryAction {
+    margin: 12px 0 16px;
   }
 }

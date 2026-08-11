@@ -123,7 +123,6 @@ const configuredChain = Number(import.meta.env.VITE_BIT_CHAIN_ID ?? sepolia.id) 
 const defaultRpcURL = import.meta.env.VITE_BIT_RPC_URL ?? readStoredValue("bit.rpcURL") ?? "https://ethereum-sepolia-rpc.publicnode.com";
 const defaultContract = import.meta.env.VITE_BIT_CONTRACT ?? readStoredValue("bit.contract") ?? "0x34B9D83E03E2E7BF646E2452E0620E2F39cDbeE3";
 const defaultGateway = import.meta.env.VITE_BIT_IPFS_GATEWAY ?? readStoredValue("bit.ipfsGateway") ?? "https://ipfs.sugang.click/ipfs";
-const defaultIpfsAPI = "http://127.0.0.1:5001";
 const APP_VERSION = "1.1.0";
 const LOG_BLOCK_RANGE = 50_000n;
 const ROLE_LABELS = ["None", "Contributor", "Maintainer", "Owner"] as const;
@@ -177,7 +176,6 @@ function App() {
   const [loadingRepos, setLoadingRepos] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
-  const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
   const [forkProgress, setForkProgress] = useState<{ copied: number; total: number } | null>(null);
   const [workflowVisible, setWorkflowVisible] = useState(false);
   const [activeWorkflowStep, setActiveWorkflowStep] = useState(0);
@@ -220,8 +218,6 @@ function App() {
       setSelectedBranch(nextRoute.branch ?? "");
       setSelectedPrId(nextRoute.prId);
       setActiveTab(nextRoute.prId ? "prs" : "commits");
-      setCopyState("idle");
-
       if (nextRoute.page === "home") {
         setCommits([]);
         setPullRequests([]);
@@ -362,7 +358,6 @@ function App() {
     setSelectedPrId(null);
     setPrFilter("open");
     setActiveTab("commits");
-    setCopyState("idle");
     autoLoadedRouteRef.current = `${contractAddress}:${repoId.toString()}:${branch}`;
     await loadRepoDetail(repoId, repos, branch);
   }
@@ -375,7 +370,6 @@ function App() {
     setSelectedPrId(null);
     setPrFilter("open");
     setActiveTab("commits");
-    setCopyState("idle");
     setCommits([]);
     setPullRequests([]);
     setBranches([]);
@@ -973,26 +967,6 @@ function App() {
     }
   }
 
-  async function copyForkCommand() {
-    if (!detailRepo) return;
-
-    const command = buildForkCommand({
-      contractAddress,
-      repoId: detailRepo.id,
-      branch: selectedBranch || detailRepo.metadata?.defaultBranch || "main",
-      rpcURL,
-      ipfsAPI: defaultIpfsAPI,
-    });
-
-    try {
-      await navigator.clipboard.writeText(command);
-      setCopyState("copied");
-      window.setTimeout(() => setCopyState("idle"), 1500);
-    } catch (err) {
-      setError(errorMessage(err));
-    }
-  }
-
   function branchLabel(repoId: bigint, branchHash: Hex): string {
     const branchName = branchNameByHash.get(branchHash.toLowerCase());
     if (branchName) return branchName;
@@ -1170,8 +1144,10 @@ function App() {
 
           <section className="protocolBand">
             <div className="protocolIntro">
-              <div className="eyebrow">Built for collaborative code</div>
-              <h2>Clear ownership. Portable history.</h2>
+              <div>
+                <div className="eyebrow">Built for collaborative code</div>
+                <h2>Clear ownership. Portable history.</h2>
+              </div>
               <p>Bit keeps the Git workflow familiar while moving repository state and review authority into a public, verifiable protocol.</p>
             </div>
 
@@ -1262,20 +1238,17 @@ function App() {
               <h2>{detailRepo.metadata?.name || `Repo #${detailRepo.id}`}</h2>
               <p>{detailRepo.metadata?.description || "Metadata and pull request state for the selected repository."}</p>
             </div>
-            <div className="detailHeaderActions">
+          </header>
+          <div className="detailPrimaryAction">
               <button
                 type="button"
-                className="primaryButton copyButton"
+                className="primaryButton forkButton"
                 onClick={() => void forkRepository()}
                 disabled={!walletAddress || loadingAction === "fork" || loadingDetail}
               >
                 {forkProgress ? `Forking ${forkProgress.copied}/${forkProgress.total}` : `Fork ${selectedBranch || detailRepo.metadata?.defaultBranch || "main"}`}
               </button>
-              <button type="button" className="ghostButton copyButton" onClick={() => void copyForkCommand()} disabled={!detailRepo}>
-                {copyState === "copied" ? "Copied CLI fork command" : "Copy CLI fork command"}
-              </button>
-            </div>
-          </header>
+          </div>
 
           <div className="detailShell">
             <aside className="detailNav">
@@ -1781,25 +1754,6 @@ function routeFromLocation(
   }
   const params = new URLSearchParams(search);
   return { page: "project", repoId: BigInt(match[1]), branch: params.get("branch"), prId: null };
-}
-
-function buildForkCommand(options: {
-  contractAddress: string;
-  repoId: bigint;
-  branch: string;
-  rpcURL: string;
-  ipfsAPI: string;
-}): string {
-  const contract = options.contractAddress || "0xYourContractAddress";
-  return [
-    "bit fork",
-    `bit://local/${contract}/${options.repoId.toString()}`,
-    `--rpc ${options.rpcURL}`,
-    `--contract ${contract}`,
-    `--key <YOUR_PRIVATE_KEY>`,
-    `--ipfs ${options.ipfsAPI}`,
-    `--branch ${options.branch}`,
-  ].join(" ");
 }
 
 function repoIdFromCreateReceipt(logs: readonly { data: Hex; topics: readonly Hex[] }[]): bigint {
