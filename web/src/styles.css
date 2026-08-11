@@ -1,4 +1,6 @@
 :root {
+  --content-width: 1180px;
+  --page-gutter: 24px;
   color: #eff3ef;
   background:
     radial-gradient(circle at top left, rgba(124, 211, 156, 0.12), transparent 24%),
@@ -192,7 +194,13 @@ button:disabled {
 .connectBand,
 .projectsBand,
 .detailBand {
-  padding: 28px 24px;
+  padding: 28px var(--page-gutter);
+}
+
+.heroBand,
+.projectsBand {
+  width: min(100%, calc(var(--content-width) + (var(--page-gutter) * 2)));
+  margin-inline: auto;
 }
 
 .heroBand {
@@ -230,6 +238,23 @@ button:disabled {
   font-size: 16px;
   line-height: 1.55;
   color: rgba(239, 243, 239, 0.72);
+}
+
+.heroSignals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.heroSignals span {
+  padding: 6px 9px;
+  border: 1px solid rgba(124, 211, 156, 0.18);
+  border-radius: 999px;
+  background: rgba(124, 211, 156, 0.05);
+  color: rgba(183, 241, 200, 0.82);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
 }
 
 .heroActions {
@@ -273,6 +298,434 @@ button:disabled {
     linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
   box-shadow: inset 0 0 120px rgba(124, 211, 156, 0.05);
 }
+
+.repoPreview {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 600px);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 14px;
+  background: #0b0f0d;
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(124, 211, 156, 0.05),
+    0 0 80px rgba(124, 211, 156, 0.07);
+}
+
+.repoPreviewBar,
+.repoPreviewFooter,
+.studioTabs,
+.terminalTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.repoPreviewBar {
+  min-height: 48px;
+  padding: 0 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(239, 243, 239, 0.58);
+  font-size: 11px;
+}
+
+.windowDots {
+  display: flex;
+  gap: 5px;
+}
+
+.windowDots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(239, 243, 239, 0.3);
+}
+
+.windowDots span:nth-child(1) { background: #d97768; }
+.windowDots span:nth-child(2) { background: #d8b56b; }
+.windowDots span:nth-child(3) { background: #75bf8a; }
+
+.previewBranch,
+.studioStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #a7eab9;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 10px;
+}
+
+.previewBranch i,
+.studioStatus i,
+.repoPreviewFooter i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #7cd39c;
+  box-shadow: 0 0 12px rgba(124, 211, 156, 0.9);
+}
+
+.repoPreviewBody {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.72fr) minmax(0, 1.28fr);
+  min-height: 264px;
+}
+
+.repoTree,
+.repoCode {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 22px 16px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.repoTree {
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(239, 243, 239, 0.46);
+}
+
+.repoTree .treeRoot { color: #b8ecc6; }
+
+.repoCode {
+  color: rgba(239, 243, 239, 0.75);
+}
+
+.repoCode span {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 7px;
+}
+
+.repoCode b {
+  color: rgba(239, 243, 239, 0.25);
+  font-weight: 400;
+}
+
+.repoCode em,
+.comment {
+  color: #78b98b;
+  font-style: normal;
+}
+
+.repoCode strong { color: rgba(239, 243, 239, 0.34); }
+
+.repoCode mark,
+.codeEditor mark {
+  background: transparent;
+  color: #b6ec85;
+}
+
+.repoPreviewFooter {
+  min-height: 42px;
+  padding: 0 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(239, 243, 239, 0.47);
+  font-size: 10px;
+}
+
+.repoPreviewFooter > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #9adbaa;
+}
+
+.workflowBand,
+.protocolBand {
+  padding: 100px var(--page-gutter);
+}
+
+.workflowBand {
+  position: relative;
+  overflow: hidden;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background:
+    radial-gradient(circle at 92% 8%, rgba(124, 211, 156, 0.1), transparent 26%),
+    rgba(255, 255, 255, 0.012);
+}
+
+.workflowBand::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 100% 52px;
+  mask-image: linear-gradient(to bottom, transparent, black 16%, black 84%, transparent);
+}
+
+.workflowHeading,
+.workflowShell,
+.protocolBand > * {
+  position: relative;
+  z-index: 1;
+  width: min(var(--content-width), 100%);
+  margin-inline: auto;
+}
+
+.workflowHeading {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.65fr);
+  align-items: end;
+  gap: 36px;
+  margin-bottom: 30px;
+}
+
+.workflowHeading h2,
+.protocolIntro h2 {
+  max-width: 14ch;
+  margin: 0;
+  font-size: clamp(30px, 3.6vw, 50px);
+  line-height: 1.03;
+  letter-spacing: -0.045em;
+}
+
+.workflowHeading p,
+.protocolIntro p {
+  margin: 0;
+  color: rgba(239, 243, 239, 0.62);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.workflowShell {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  min-height: 390px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  overflow: hidden;
+  background: #090c0a;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.28);
+}
+
+.workflowSteps {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 12px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.workflowStep {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  align-items: center;
+  gap: 9px;
+  min-height: 46px;
+  padding: 0 10px;
+  border-color: transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: rgba(239, 243, 239, 0.5);
+  text-align: left;
+}
+
+.workflowStep span {
+  color: rgba(239, 243, 239, 0.28);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+}
+
+.workflowStep strong {
+  font-size: 13px;
+}
+
+.workflowStep:hover,
+.workflowStep.active {
+  border-color: rgba(124, 211, 156, 0.18);
+  background: rgba(124, 211, 156, 0.08);
+  color: #ddffe6;
+}
+
+.workflowStep.active span { color: #84d69b; }
+
+.commandStudio {
+  display: grid;
+  grid-template-rows: auto minmax(205px, 1fr) auto;
+  min-width: 0;
+}
+
+.studioTabs {
+  min-height: 48px;
+  padding: 0 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.studioTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(239, 243, 239, 0.67);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+}
+
+.fileDot {
+  width: 8px;
+  height: 10px;
+  border: 1px solid #83c89a;
+  border-radius: 1px;
+}
+
+.codeEditor {
+  display: grid;
+  align-content: center;
+  gap: 9px;
+  padding: 28px 22px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.018), transparent 38%);
+}
+
+.editorLine {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  min-height: 22px;
+  color: rgba(239, 243, 239, 0.48);
+  font-size: clamp(11px, 1.5vw, 13px);
+  line-height: 1.6;
+}
+
+.editorLine > span { color: rgba(239, 243, 239, 0.2); text-align: right; }
+.editorLine code { overflow-wrap: anywhere; }
+
+.editorLine.active {
+  margin-inline: -10px;
+  padding-inline: 10px;
+  border-left: 2px solid #7cd39c;
+  background: rgba(124, 211, 156, 0.06);
+  color: #e5f8e9;
+}
+
+.typingCursor {
+  display: inline-block;
+  width: 7px;
+  height: 1.1em;
+  margin-left: 2px;
+  vertical-align: -0.2em;
+  background: #a5ecb9;
+  animation: blink 0.92s steps(2, start) infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+.terminalOutput {
+  min-height: 116px;
+  padding: 12px 16px 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: #060806;
+  color: rgba(221, 255, 230, 0.7);
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.terminalTitle {
+  margin-bottom: 5px;
+  color: rgba(239, 243, 239, 0.35);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.terminalLine { display: flex; gap: 8px; }
+.terminalLine i { color: #8adca1; font-style: normal; }
+.terminalLine.muted { color: rgba(239, 243, 239, 0.32); }
+
+.protocolBand {
+  display: grid;
+  gap: 38px;
+}
+
+.protocolIntro {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.68fr);
+  align-items: end;
+  gap: 32px;
+}
+
+.benefitGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.benefitCard {
+  min-height: 220px;
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
+}
+
+.benefitIndex {
+  display: block;
+  color: #83d79c;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+}
+
+.benefitCard h3 {
+  margin: 38px 0 10px;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.benefitCard p,
+.roleCard p {
+  margin: 0;
+  color: rgba(239, 243, 239, 0.57);
+  font-size: 13px;
+  line-height: 1.58;
+}
+
+.rolesPanel {
+  display: grid;
+  grid-template-columns: 0.55fr 1.45fr;
+  gap: 24px;
+  padding: 24px;
+  border: 1px solid rgba(124, 211, 156, 0.18);
+  border-radius: 12px;
+  background: rgba(124, 211, 156, 0.035);
+}
+
+.rolesHeading h3 { margin: 0; font-size: 22px; letter-spacing: -0.03em; }
+
+.roleGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.roleCard {
+  min-height: 134px;
+  padding: 14px;
+  border-left: 2px solid rgba(239, 243, 239, 0.22);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.roleCard > span {
+  display: block;
+  margin-bottom: 20px;
+  color: rgba(239, 243, 239, 0.42);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.roleCard strong { display: block; margin-bottom: 7px; font-size: 14px; }
+.roleCard.owner { border-color: #dac478; }
+.roleCard.maintainer { border-color: #7cd39c; }
+.roleCard.contributor { border-color: #84b9f4; }
 
 .cube {
   position: relative;
@@ -525,6 +978,10 @@ input:focus {
 }
 
 @media (max-width: 760px) {
+  :root {
+    --page-gutter: 16px;
+  }
+
   .prFormGrid {
     grid-template-columns: 1fr;
   }
@@ -590,9 +1047,31 @@ input:focus {
   color: rgba(239, 243, 239, 0.72);
 }
 
+.projectsActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.repositoryRefreshButton {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.repositoryPanel {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
 .projectList {
   display: grid;
-  gap: 12px;
 }
 
 .projectRow {
@@ -602,14 +1081,23 @@ input:focus {
   gap: 18px;
   padding: 16px 18px;
   text-align: left;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.025);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.projectRow + .projectRow {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.projectRow:hover {
+  background: rgba(124, 211, 156, 0.05);
 }
 
 .projectRow.active {
-  border-color: rgba(124, 211, 156, 0.32);
-  box-shadow: inset 0 0 0 1px rgba(124, 211, 156, 0.1);
+  box-shadow:
+    inset 3px 0 0 rgba(124, 211, 156, 0.56),
+    inset 0 0 0 1px rgba(124, 211, 156, 0.1);
 }
 
 .projectMain {
@@ -648,6 +1136,42 @@ input:focus {
   padding: 18px;
   color: rgba(239, 243, 239, 0.52);
   background: rgba(255, 255, 255, 0.02);
+}
+
+.projectList .emptyStage {
+  border: 0;
+  border-radius: 0;
+}
+
+.repositoryPagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  min-height: 58px;
+  padding: 10px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.paginationButton {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.paginationButton.active {
+  border-color: rgba(124, 211, 156, 0.48);
+  background: rgba(124, 211, 156, 0.14);
+  color: #effff1;
+}
+
+.paginationEllipsis {
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  color: rgba(239, 243, 239, 0.52);
 }
 
 .tabs {
@@ -991,12 +1515,12 @@ input:focus {
   margin-bottom: 16px;
 }
 
-.detailHeaderActions {
+.detailPrimaryAction {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
+  margin: 10px 0 18px;
+  padding: 2px 0;
 }
 
 .detailHeader h2 {
@@ -1011,7 +1535,7 @@ input:focus {
   color: rgba(239, 243, 239, 0.62);
 }
 
-.copyButton {
+.forkButton {
   min-width: 180px;
   min-height: 44px;
 }
@@ -1065,6 +1589,17 @@ input:focus {
   .heroVisual {
     min-height: 380px;
   }
+
+  .workflowHeading,
+  .protocolIntro,
+  .rolesPanel {
+    grid-template-columns: 1fr;
+  }
+
+  .workflowHeading h2,
+  .protocolIntro h2 {
+    max-width: 18ch;
+  }
 }
 
 @media (max-width: 760px) {
@@ -1076,6 +1611,58 @@ input:focus {
   .heroCopy h1 {
     font-size: clamp(38px, 15vw, 64px);
   }
+
+  .heroVisual {
+    min-height: 310px;
+  }
+
+  .repoPreviewBody {
+    grid-template-columns: 1fr;
+  }
+
+  .repoTree {
+    display: none;
+  }
+
+  .workflowBand,
+  .protocolBand {
+    padding: 70px var(--page-gutter);
+  }
+
+  .workflowShell {
+    grid-template-columns: 1fr;
+  }
+
+  .workflowSteps {
+    display: flex;
+    overflow-x: auto;
+    gap: 6px;
+    padding: 8px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .workflowStep {
+    flex: 0 0 auto;
+    min-height: 36px;
+  }
+
+  .workflowStep span { display: none; }
+
+  .studioTabs,
+  .codeEditor,
+  .terminalOutput {
+    padding-inline: 12px;
+  }
+
+  .studioStatus { display: none; }
+
+  .benefitGrid,
+  .roleGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .benefitCard { min-height: 0; }
 
   .connectGrid,
   .connectMeta,
@@ -1102,6 +1689,20 @@ input:focus {
     flex-direction: column;
   }
 
+  .projectsActions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .repositoryPagination {
+    gap: 4px;
+  }
+
+  .paginationButton {
+    min-width: 32px;
+    padding-inline: 8px;
+  }
+
   .detailHeader {
     flex-direction: column;
   }
@@ -1121,11 +1722,7 @@ input:focus {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .detailHeaderActions {
-    justify-content: flex-start;
-  }
-
-  .copyButton {
-    width: 100%;
+  .detailPrimaryAction {
+    margin: 12px 0 16px;
   }
 }

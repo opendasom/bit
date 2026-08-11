@@ -12,107 +12,53 @@ import {
   type Address,
   type Hex,
 } from "viem";
-import { sepolia } from "viem/chains";
+import { foundry, sepolia } from "viem/chains";
 import bitRegistryArtifact from "../../internal/chain/artifacts/BitRegistry.json";
+import { PrDetailView } from "./components/PrDetailView";
+import { RepositoryList } from "./components/RepositoryList";
+import { APP_VERSION, LOG_BLOCK_RANGE, WORKFLOW_STEPS, type RoleLabel } from "./constants";
 import "./styles.css";
-
-type RepoMetadata = {
-  version?: number;
-  name?: string;
-  description?: string;
-  defaultBranch?: string;
-};
-
-type RepoSummary = {
-  id: bigint;
-  owner: Address;
-  metadataCID: string;
-  metadata: RepoMetadata | null;
-};
-
-type BranchSummary = {
-  name: string;
-  branchHash: Hex;
-  commitCount: number;
-  headCommit: string;
-};
-
-type CommitSummary = {
-  hash: string;
-  treeHash: string;
-  updater: Address;
-  chainTimestamp: bigint;
-  message: string;
-  authorName: string;
-  authorEmail: string;
-  authorDate: string;
-  committerName: string;
-  committerEmail: string;
-  committerDate: string;
-  parents: string[];
-};
-
-type PullRequestSummary = {
-  id: bigint;
-  targetRepoId: bigint;
-  targetBranch: Hex;
-  sourceRepoId: bigint;
-  sourceBranch: Hex;
-  baseCommit: Hex;
-  sourceHeadCommit: Hex;
-  author: Address;
-  status: bigint;
-  createdAt: bigint;
-  updatedAt: bigint;
-  description: string;
-};
-
-type Manifest = {
-  gitCommit: string;
-  treeHash: string;
-  branch?: string;
-  parentCommits?: string[];
-  author?: Identity;
-  committer?: Identity;
-  message?: string;
-};
-
-type Identity = {
-  name?: string;
-  email?: string;
-  date?: string;
-};
-
-type EthereumProvider = {
-  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-};
-
-type PullRequestCreatedLog = {
-  args: { prId?: bigint | null; sourceRepoId?: bigint | null };
-};
-
-type CommitRecordedLog = {
-  args: { commitHash?: Hex; manifestDigest?: Hex };
-};
-
-type PageState = "home" | "project";
-
-declare global {
-  interface Window {
-    ethereum?: EthereumProvider;
-  }
-}
+import type {
+  BranchSummary,
+  CommitRecordedLog,
+  CommitSummary,
+  ForkCommitRecord,
+  Manifest,
+  PageState,
+  PullRequestCreatedLog,
+  PullRequestSummary,
+  RepoMetadata,
+  RepoSummary,
+} from "./types";
+import {
+  bytes20HexToGitHash,
+  bytesHexToString,
+  cidV0FromDigest,
+  errorMessage,
+  fetchJson,
+  formatChainId,
+  formatDate,
+  formatUnix,
+  getManifest,
+  ipfsURL,
+  parseAddress,
+  parseOptionalBigInt,
+  prStatusChipClass,
+  prStatusLabel,
+  readStoredValue,
+  repoIdFromCreateReceipt,
+  roleToLabel,
+  routeFromLocation,
+  shortAddress,
+  shortHex,
+  writeStoredValue,
+} from "./utils";
 
 const abi = bitRegistryArtifact.abi;
-const defaultRpcURL = readStoredValue("bit.rpcURL") ?? "https://ethereum-sepolia-rpc.publicnode.com";
-const defaultContract = readStoredValue("bit.contract") ?? "0x34B9D83E03E2E7BF646E2452E0620E2F39cDbeE3";
-const defaultGateway = readStoredValue("bit.ipfsGateway") ?? "https://ipfs.sugang.click/ipfs";
-const defaultIpfsAPI = "http://127.0.0.1:5001";
-const APP_VERSION = "1.1.0";
-const LOG_BLOCK_RANGE = 50_000n;
-const ROLE_LABELS = ["None", "Contributor", "Maintainer", "Owner"] as const;
-type RoleLabel = (typeof ROLE_LABELS)[number];
-const PR_STATUS_LABELS = ["", "Open", "Approved", "Rejected", "Closed"] as const;
+const configuredChain = Number(import.meta.env.VITE_BIT_CHAIN_ID ?? sepolia.id) === foundry.id ? foundry : sepolia;
+const defaultRpcURL = import.meta.env.VITE_BIT_RPC_URL ?? readStoredValue("bit.rpcURL") ?? "https://ethereum-sepolia-rpc.publicnode.com";
+const defaultContract = import.meta.env.VITE_BIT_CONTRACT ?? readStoredValue("bit.contract") ?? "0x34B9D83E03E2E7BF646E2452E0620E2F39cDbeE3";
+const defaultGateway = import.meta.env.VITE_BIT_IPFS_GATEWAY ?? readStoredValue("bit.ipfsGateway") ?? "https://ipfs.sugang.click/ipfs";
 
 function App() {
   const initialRoute = routeFromLocation(window.location.pathname, window.location.search);
@@ -135,7 +81,10 @@ function App() {
   const [loadingRepos, setLoadingRepos] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
-  const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
+  const [forkProgress, setForkProgress] = useState<{ copied: number; total: number } | null>(null);
+  const [workflowVisible, setWorkflowVisible] = useState(false);
+  const [activeWorkflowStep, setActiveWorkflowStep] = useState(0);
+  const [typedWorkflowCommand, setTypedWorkflowCommand] = useState("");
   const [error, setError] = useState("");
   const [showCreatePr, setShowCreatePr] = useState(false);
   const [newPrTargetRepoId, setNewPrTargetRepoId] = useState("");
@@ -148,6 +97,8 @@ function App() {
   const publicClient = useMemo(() => createPublicClient({ transport: http(rpcURL) }), [rpcURL]);
   const selectedRepo = repos.find((repo) => repo.id === selectedRepoId) ?? null;
   const autoLoadedRouteRef = useRef<string | null>(null);
+  const autoLoadedReposRef = useRef(false);
+  const workflowRef = useRef<HTMLElement | null>(null);
   const detailRepo =
     selectedRepo ?? (selectedRepoId ? { id: selectedRepoId, owner: "0x0000000000000000000000000000000000000000" as Address, metadataCID: "", metadata: null } : null);
   const repoNameById = useMemo(() => {
@@ -164,7 +115,6 @@ function App() {
     }
     return map;
   }, [branches]);
-
   useEffect(() => {
     const onPopState = () => {
       const nextRoute = routeFromLocation(window.location.pathname, window.location.search);
@@ -173,8 +123,6 @@ function App() {
       setSelectedBranch(nextRoute.branch ?? "");
       setSelectedPrId(nextRoute.prId);
       setActiveTab(nextRoute.prId ? "prs" : "commits");
-      setCopyState("idle");
-
       if (nextRoute.page === "home") {
         setCommits([]);
         setPullRequests([]);
@@ -218,6 +166,47 @@ function App() {
     void loadPullRequestDetail(pr);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPrId, pullRequests]);
+
+  useEffect(() => {
+    const target = workflowRef.current;
+    if (!target || workflowVisible) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setWorkflowVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.28 },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [workflowVisible]);
+
+  useEffect(() => {
+    if (!workflowVisible) return;
+    const command = WORKFLOW_STEPS[activeWorkflowStep].command;
+    if (typedWorkflowCommand.length < command.length) {
+      const timer = window.setTimeout(() => {
+        setTypedWorkflowCommand(command.slice(0, typedWorkflowCommand.length + 1));
+      }, 22);
+      return () => window.clearTimeout(timer);
+    }
+
+    const timer = window.setTimeout(() => {
+      setActiveWorkflowStep((index) => (index + 1) % WORKFLOW_STEPS.length);
+      setTypedWorkflowCommand("");
+    }, 2400);
+    return () => window.clearTimeout(timer);
+  }, [activeWorkflowStep, typedWorkflowCommand, workflowVisible]);
+
+  useEffect(() => {
+    if (page !== "home" || autoLoadedReposRef.current) return;
+    autoLoadedReposRef.current = true;
+    void loadRepos();
+    // Repository settings are deliberately refreshed through the Refresh button.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   async function loadRepos() {
     setLoadingRepos(true);
@@ -277,7 +266,6 @@ function App() {
     setSelectedPrId(null);
     setPrFilter("open");
     setActiveTab("commits");
-    setCopyState("idle");
     autoLoadedRouteRef.current = `${contractAddress}:${repoId.toString()}:${branch}`;
     await loadRepoDetail(repoId, repos, branch);
   }
@@ -290,7 +278,6 @@ function App() {
     setSelectedPrId(null);
     setPrFilter("open");
     setActiveTab("commits");
-    setCopyState("idle");
     setCommits([]);
     setPullRequests([]);
     setBranches([]);
@@ -547,14 +534,14 @@ function App() {
     setError("");
     try {
       const chainId = (await window.ethereum.request({ method: "eth_chainId" })) as string;
-      if (Number.parseInt(chainId, 16) !== sepolia.id) {
-        setError("MetaMask network를 Sepolia로 변경하세요.");
+      if (Number.parseInt(chainId, 16) !== configuredChain.id) {
+        setError(`MetaMask network를 ${configuredChain.name}로 변경하세요.`);
         return;
       }
       const address = parseAddress(contractAddress);
       const walletClient = createWalletClient({
         account: walletAddress,
-        chain: sepolia,
+        chain: configuredChain,
         transport: custom(window.ethereum),
       });
       const txHash = await walletClient.writeContract({
@@ -609,14 +596,14 @@ function App() {
     setError("");
     try {
       const chainId = (await window.ethereum.request({ method: "eth_chainId" })) as string;
-      if (Number.parseInt(chainId, 16) !== sepolia.id) {
-        setError("MetaMask network를 Sepolia로 변경하세요.");
+      if (Number.parseInt(chainId, 16) !== configuredChain.id) {
+        setError(`MetaMask network를 ${configuredChain.name}로 변경하세요.`);
         return;
       }
       const address = parseAddress(contractAddress);
       const walletClient = createWalletClient({
         account: walletAddress,
-        chain: sepolia,
+        chain: configuredChain,
         transport: custom(window.ethereum),
       });
       const txHash = await walletClient.writeContract({
@@ -642,6 +629,169 @@ function App() {
     } catch (err) {
       setError(errorMessage(err));
     } finally {
+      setLoadingAction(null);
+    }
+  }
+
+  async function forkRepository() {
+    if (!window.ethereum) {
+      setError("MetaMask가 필요합니다.");
+      return;
+    }
+    if (!walletAddress) {
+      setError("먼저 MetaMask를 연결하세요.");
+      return;
+    }
+    if (!selectedRepoId) {
+      setError("선택된 프로젝트가 없습니다.");
+      return;
+    }
+
+    const branch = selectedBranch || detailRepo?.metadata?.defaultBranch || "main";
+    if (!window.confirm(`'${branch}' 브랜치의 모든 커밋을 새 온체인 저장소로 복제합니다. 커밋 수만큼 MetaMask 트랜잭션 승인이 필요합니다. 계속할까요?`)) {
+      return;
+    }
+
+    let forkRepoId: bigint | null = null;
+    setLoadingAction("fork");
+    setForkProgress(null);
+    setError("");
+
+    try {
+      const chainId = (await window.ethereum.request({ method: "eth_chainId" })) as string;
+      if (Number.parseInt(chainId, 16) !== configuredChain.id) {
+        setError(`MetaMask network를 ${configuredChain.name}로 변경하세요.`);
+        return;
+      }
+
+      const address = parseAddress(contractAddress);
+      const branchHash = keccak256(stringToBytes(branch));
+      const historyLength = (await publicClient.readContract({
+        address,
+        abi,
+        functionName: "getBranchHistoryLength",
+        args: [selectedRepoId, branchHash],
+      })) as bigint;
+      if (historyLength === 0n) {
+        setError(`'${branch}' 브랜치에 복제할 커밋이 없습니다.`);
+        return;
+      }
+
+      const sourceMetadataCID = detailRepo?.metadataCID || bytesHexToString(
+        ((await publicClient.readContract({
+          address,
+          abi,
+          functionName: "getRepo",
+          args: [selectedRepoId],
+        })) as [Address, Hex])[1],
+      );
+      const sourceMetadata =
+        detailRepo?.metadata ?? (sourceMetadataCID ? await fetchJson<RepoMetadata>(ipfsURL(ipfsGateway, sourceMetadataCID)) : null);
+
+      const records: ForkCommitRecord[] = [];
+      const pageSize = 100n;
+      for (let start = 0n; start < historyLength; start += pageSize) {
+        const limit = historyLength - start > pageSize ? pageSize : historyLength - start;
+        const [commitHashes, treeHashes, manifestDigests, diffDigests] = (await publicClient.readContract({
+          address,
+          abi,
+          functionName: "getBranchCommitsWithMetadata",
+          args: [selectedRepoId, branchHash, start, limit],
+        })) as [Hex[], Hex[], Hex[], Hex[]];
+        for (let index = 0; index < commitHashes.length; index++) {
+          records.push({
+            commitHash: commitHashes[index],
+            treeHash: treeHashes[index],
+            manifestDigest: manifestDigests[index],
+            diffDigest: diffDigests[index],
+          });
+        }
+      }
+
+      const walletClient = createWalletClient({
+        account: walletAddress,
+        chain: configuredChain,
+        transport: custom(window.ethereum),
+      });
+      const createTxHash = await walletClient.writeContract({
+        address,
+        abi,
+        functionName: "createRepo",
+        args: [stringToHex(sourceMetadataCID)],
+      });
+      const createReceipt = await publicClient.waitForTransactionReceipt({ hash: createTxHash });
+      if (createReceipt.status !== "success") {
+        throw new Error("fork 저장소 생성 트랜잭션이 revert 되었습니다.");
+      }
+      forkRepoId = repoIdFromCreateReceipt(createReceipt.logs);
+
+      let expectedOldCommit = "0x0000000000000000000000000000000000000000" as Hex;
+      for (let index = 0; index < records.length; index++) {
+        const record = records[index];
+        setForkProgress({ copied: index, total: records.length });
+        const parentCount = (await publicClient.readContract({
+          address,
+          abi,
+          functionName: "getCommitParentCount",
+          args: [selectedRepoId, record.commitHash],
+        })) as bigint;
+        const parents: Hex[] = [];
+        for (let parentIndex = 0n; parentIndex < parentCount; parentIndex++) {
+          parents.push(
+            (await publicClient.readContract({
+              address,
+              abi,
+              functionName: "getCommitParentAt",
+              args: [selectedRepoId, record.commitHash, parentIndex],
+            })) as Hex,
+          );
+        }
+
+        const recordTxHash = await walletClient.writeContract({
+          address,
+          abi,
+          functionName: "recordCommit",
+          args: [
+            forkRepoId,
+            branchHash,
+            expectedOldCommit,
+            record.commitHash,
+            record.treeHash,
+            parents,
+            record.manifestDigest,
+            record.diffDigest,
+          ],
+        });
+        const recordReceipt = await publicClient.waitForTransactionReceipt({ hash: recordTxHash });
+        if (recordReceipt.status !== "success") {
+          throw new Error(`커밋 ${index + 1}/${records.length} 복제 트랜잭션이 revert 되었습니다.`);
+        }
+        expectedOldCommit = record.commitHash;
+        setForkProgress({ copied: index + 1, total: records.length });
+      }
+
+      const forkRepo: RepoSummary = {
+        id: forkRepoId,
+        owner: walletAddress,
+        metadataCID: sourceMetadataCID,
+        metadata: sourceMetadata,
+      };
+      const nextRepos = [...repos, forkRepo];
+      setRepos(nextRepos);
+      const nextPath = `/projects/${forkRepoId.toString()}?branch=${encodeURIComponent(branch)}`;
+      window.history.pushState({}, "", nextPath);
+      setPage("project");
+      setSelectedRepoId(forkRepoId);
+      setSelectedBranch(branch);
+      setSelectedPrId(null);
+      setActiveTab("commits");
+      autoLoadedRouteRef.current = `${contractAddress}:${forkRepoId.toString()}:${branch}`;
+      await loadRepoDetail(forkRepoId, nextRepos, branch);
+    } catch (err) {
+      const suffix = forkRepoId ? ` Fork repo #${forkRepoId.toString()} may be partially copied; do not retry without checking it first.` : "";
+      setError(`${errorMessage(err)}${suffix}`);
+    } finally {
+      setForkProgress(null);
       setLoadingAction(null);
     }
   }
@@ -725,26 +875,6 @@ function App() {
     }
   }
 
-  async function copyForkCommand() {
-    if (!detailRepo) return;
-
-    const command = buildForkCommand({
-      contractAddress,
-      repoId: detailRepo.id,
-      branch: selectedBranch || detailRepo.metadata?.defaultBranch || "main",
-      rpcURL,
-      ipfsAPI: defaultIpfsAPI,
-    });
-
-    try {
-      await navigator.clipboard.writeText(command);
-      setCopyState("copied");
-      window.setTimeout(() => setCopyState("idle"), 1500);
-    } catch (err) {
-      setError(errorMessage(err));
-    }
-  }
-
   function branchLabel(repoId: bigint, branchHash: Hex): string {
     const branchName = branchNameByHash.get(branchHash.toLowerCase());
     if (branchName) return branchName;
@@ -768,6 +898,7 @@ function App() {
 
   const walletSummary = walletAddress ? `${shortAddress(walletAddress)} · ${formatChainId(walletChainId)}` : "";
   const contractSummary = contractAddress ? shortAddress(contractAddress) : "n/a";
+  const workflowStep = WORKFLOW_STEPS[activeWorkflowStep];
 
   return (
     <main className="page">
@@ -813,65 +944,169 @@ function App() {
         <>
           <section className="heroBand">
             <div className="heroCopy">
-              <div className="heroKicker">01. Landing Page</div>
-              <h1>BIT</h1>
-              <p>Repository history and pull request metadata, recorded on-chain and surfaced read-only in the browser.</p>
+              <div className="heroKicker">Open protocol for source history</div>
+              <h1>Git history,<br />verified.</h1>
+              <p>Bit records repository state on Ethereum and keeps commit data addressable through IPFS — without a central Git host.</p>
+              <div className="heroSignals" aria-label="Bit protocol components">
+                <span>Git-compatible</span>
+                <span>IPFS-backed</span>
+                <span>Ethereum-verified</span>
+              </div>
               <div className="heroActions">
-                <button type="button" className="primaryButton heroButton" onClick={loadRepos} disabled={loadingRepos}>
-                  {loadingRepos ? "Loading..." : "Load repositories"}
+                <button
+                  type="button"
+                  className="primaryButton heroButton"
+                  onClick={() => document.getElementById("projects-band")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                >
+                  Explore repositories
                 </button>
                 <button
                   type="button"
                   className="ghostButton heroButton"
-                  onClick={() => document.getElementById("projects-band")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  onClick={() => document.getElementById("workflow")?.scrollIntoView({ behavior: "smooth", block: "start" })}
                 >
-                  View projects
+                  Read the workflow
                 </button>
               </div>
             </div>
 
-            <div className="heroVisual" aria-hidden="true">
-              <div className="cube">
-                <span />
-                <span />
-                <span />
+            <div className="heroVisual" aria-label="Repository protocol preview">
+              <div className="repoPreview">
+                <div className="repoPreviewBar">
+                  <div className="windowDots" aria-hidden="true"><span /><span /><span /></div>
+                  <span className="mono">bit / protocol-overview.md</span>
+                  <span className="previewBranch"><i /> main</span>
+                </div>
+                <div className="repoPreviewBody">
+                  <div className="repoTree mono" aria-hidden="true">
+                    <span className="treeRoot">bit/</span>
+                    <span>├─ contracts/</span>
+                    <span>│  └─ BitRegistry.sol</span>
+                    <span>├─ internal/</span>
+                    <span>│  └─ ipfs/</span>
+                    <span>└─ web/</span>
+                  </div>
+                  <div className="repoCode mono">
+                    <span><b>01</b><em>## source, without a host</em></span>
+                    <span><b>02</b>commit.diff  <strong>→</strong>  <mark>IPFS</mark></span>
+                    <span><b>03</b>branch.head  <strong>→</strong>  <mark>Ethereum</mark></span>
+                    <span><b>04</b>pull request <strong>→</strong>  <mark>MetaMask</mark></span>
+                    <span><b>05</b></span>
+                    <span><b>06</b><em># every ref is independently verifiable</em></span>
+                  </div>
+                </div>
+                <div className="repoPreviewFooter">
+                  <span><i /> synced to registry</span>
+                  <span className="mono">commit 72b24c6</span>
+                </div>
               </div>
             </div>
           </section>
 
-          <section className="projectsBand" id="projects-band">
-            <div className="bandHeading">
+          <section className="workflowBand" id="workflow" ref={workflowRef}>
+            <div className="workflowHeading">
               <div>
-                <div className="eyebrow">Projects</div>
-                <h2>Repository list</h2>
-                <p>Each entry is a repository registered in the current BitRegistry contract.</p>
+                <div className="eyebrow">Quick start</div>
+                <h2>Publish verifiable history in four commands.</h2>
               </div>
-              <div className="panelBadge">{repos.length} repositories</div>
+              <p>Initialize a repository, point it to BitRegistry, then publish and restore the same commit history from any machine.</p>
             </div>
 
-            <div className="projectList">
-              {repos.length === 0 && <div className="emptyStage">Load repositories to see the list.</div>}
-              {repos.map((repo) => (
-                <button
-                  key={repo.id.toString()}
-                  type="button"
-                  className="projectRow"
-                  onClick={() => {
-                    void openRepo(repo.id);
-                  }}
-                >
-                  <div className="projectMain">
-                    <div className="projectTitle">{repo.metadata?.name || `Repo #${repo.id}`}</div>
-                    <div className="projectDescription">{repo.metadata?.description || "No description provided."}</div>
-                  </div>
-                  <div className="projectMeta">
-                    <span className="mono">{shortAddress(repo.owner)}</span>
-                    <span>{repo.metadata?.defaultBranch || "main"}</span>
-                  </div>
-                </button>
-              ))}
+            <div className="workflowShell">
+              <aside className="workflowSteps" aria-label="Bit command workflow">
+                {WORKFLOW_STEPS.map((step, index) => (
+                  <button
+                    key={step.label}
+                    type="button"
+                    className={index === activeWorkflowStep ? "workflowStep active" : "workflowStep"}
+                    onClick={() => {
+                      setWorkflowVisible(true);
+                      setActiveWorkflowStep(index);
+                      setTypedWorkflowCommand("");
+                    }}
+                  >
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <strong>{step.label}</strong>
+                  </button>
+                ))}
+              </aside>
+
+              <div className="commandStudio">
+                <div className="studioTabs">
+                  <div className="studioTab"><span className="fileDot" /> {workflowStep.fileName}</div>
+                  <div className="studioStatus"><i /> live example</div>
+                </div>
+                <div className="codeEditor mono">
+                  <div className="editorLine"><span>1</span><code># {workflowStep.label.toLowerCase()} a Bit repository</code></div>
+                  <div className="editorLine"><span>2</span><code>git status --short</code></div>
+                  <div className="editorLine active"><span>3</span><code><mark>$</mark> {typedWorkflowCommand}<i className="typingCursor" /></code></div>
+                  <div className="editorLine"><span>4</span><code className="comment"># provenance is stored, not hosted</code></div>
+                </div>
+                <div className="terminalOutput mono" aria-live="polite">
+                  <div className="terminalTitle"><span>terminal</span><span>zsh</span></div>
+                  {typedWorkflowCommand.length === workflowStep.command.length ? (
+                    workflowStep.output.map((line) => <div className="terminalLine" key={line}><i>›</i>{line}</div>)
+                  ) : (
+                    <div className="terminalLine muted"><i>›</i>waiting for command…</div>
+                  )}
+                </div>
+              </div>
             </div>
           </section>
+
+          <section className="protocolBand">
+            <div className="protocolIntro">
+              <div>
+                <div className="eyebrow">Built for collaborative code</div>
+                <h2>Clear ownership. Portable history.</h2>
+              </div>
+              <p>Bit keeps the Git workflow familiar while moving repository state and review authority into a public, verifiable protocol.</p>
+            </div>
+
+            <div className="benefitGrid">
+              <article className="benefitCard">
+                <span className="benefitIndex">01</span>
+                <h3>History you can verify</h3>
+                <p>Branch heads and commit digests are recorded on-chain, so a client can independently validate the history it receives.</p>
+              </article>
+              <article className="benefitCard">
+                <span className="benefitIndex">02</span>
+                <h3>Data without a host</h3>
+                <p>Diffs and manifests are content-addressed on IPFS. A repository is not dependent on one central Git service.</p>
+              </article>
+              <article className="benefitCard">
+                <span className="benefitIndex">03</span>
+                <h3>Review at the protocol layer</h3>
+                <p>Pull request state and fast-forward approval live in BitRegistry, with MetaMask signing every write.</p>
+              </article>
+            </div>
+
+            <div className="rolesPanel">
+              <div className="rolesHeading">
+                <div className="eyebrow">Roles</div>
+                <h3>Who can do what?</h3>
+              </div>
+              <div className="roleGrid">
+                <article className="roleCard owner">
+                  <span>Owner</span>
+                  <strong>Govern access</strong>
+                  <p>Assign and revoke repository roles.</p>
+                </article>
+                <article className="roleCard maintainer">
+                  <span>Maintainer</span>
+                  <strong>Publish and merge</strong>
+                  <p>Record commits and approve or reject pull requests.</p>
+                </article>
+                <article className="roleCard contributor">
+                  <span>Contributor</span>
+                  <strong>Fork and propose</strong>
+                  <p>Fork public history, push to a fork, and open a pull request for review.</p>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <RepositoryList repos={repos} loading={loadingRepos} onRefresh={() => void loadRepos()} onOpen={openRepo} />
         </>
       )}
 
@@ -883,12 +1118,17 @@ function App() {
               <h2>{detailRepo.metadata?.name || `Repo #${detailRepo.id}`}</h2>
               <p>{detailRepo.metadata?.description || "Metadata and pull request state for the selected repository."}</p>
             </div>
-            <div className="detailHeaderActions">
-              <button type="button" className="ghostButton copyButton" onClick={() => void copyForkCommand()} disabled={!detailRepo}>
-                {copyState === "copied" ? "Copied fork command" : "Copy fork command"}
-              </button>
-            </div>
           </header>
+          <div className="detailPrimaryAction">
+              <button
+                type="button"
+                className="primaryButton forkButton"
+                onClick={() => void forkRepository()}
+                disabled={!walletAddress || loadingAction === "fork" || loadingDetail}
+              >
+                {forkProgress ? `Forking ${forkProgress.copied}/${forkProgress.total}` : `Fork ${selectedBranch || detailRepo.metadata?.defaultBranch || "main"}`}
+              </button>
+          </div>
 
           <div className="detailShell">
             <aside className="detailNav">
@@ -955,7 +1195,6 @@ function App() {
                             window.history.pushState({}, "", nextPath);
                             setSelectedBranch(branch.name);
                             setSelectedPrId(null);
-                            setCopyState("idle");
                             autoLoadedRouteRef.current = `${contractAddress}:${detailRepo.id.toString()}:${branch.name}`;
                             void loadRepoDetail(detailRepo.id, repos, branch.name);
                           }}
@@ -1245,334 +1484,6 @@ function App() {
       </footer>
     </main>
   );
-}
-
-function PrDetailView(props: {
-  pr: PullRequestSummary | null;
-  commits: CommitSummary[];
-  loading: boolean;
-  walletAddress: Address | null;
-  loadingAction: string | null;
-  branchLabel: (repoId: bigint, branchHash: Hex) => string;
-  canManage: (pr: PullRequestSummary) => boolean;
-  canClose: (pr: PullRequestSummary) => boolean;
-  onBack: () => void;
-  onAction: (pr: PullRequestSummary, action: "approvePullRequest" | "rejectPullRequest" | "closePullRequest") => void;
-}) {
-  const { pr, commits, loading, walletAddress, loadingAction, branchLabel, canManage, canClose, onBack, onAction } = props;
-  if (!pr) {
-    return (
-      <div className="panel panelTall">
-        <button type="button" className="ghostButton backButton" onClick={onBack}>
-          &larr; All pull requests
-        </button>
-        <div className="emptyState">Pull request not found.</div>
-      </div>
-    );
-  }
-
-  const titleLine = pr.description.split("\n")[0].trim() || "(no description)";
-
-  return (
-    <div className="panel panelTall">
-      <button type="button" className="ghostButton backButton" onClick={onBack}>
-        &larr; All pull requests
-      </button>
-
-      <div className="prDetailHeader">
-        <div>
-          <div className="prDetailTitleRow">
-            <span className={`statusChip ${prStatusChipClass(pr.status)}`}>{prStatusLabel(pr.status)}</span>
-            <h3 className="prDetailTitle">#{pr.id.toString()} · {titleLine}</h3>
-          </div>
-          <div className="prDetailAuthor">
-            <span className="mono">{shortAddress(pr.author)}</span>
-            <span>opened {formatUnix(pr.createdAt)}</span>
-            <span>updated {formatUnix(pr.updatedAt)}</span>
-          </div>
-        </div>
-        {pr.status === 1n && (
-          <div className="prActions">
-            {canManage(pr) && (
-              <button
-                type="button"
-                className="primaryButton"
-                disabled={!walletAddress || loadingAction === `approvePullRequest-${pr.id.toString()}`}
-                onClick={() => onAction(pr, "approvePullRequest")}
-              >
-                {loadingAction === `approvePullRequest-${pr.id.toString()}` ? "Approving..." : "Approve"}
-              </button>
-            )}
-            {canManage(pr) && (
-              <button
-                type="button"
-                className="dangerButton"
-                disabled={!walletAddress || loadingAction === `rejectPullRequest-${pr.id.toString()}`}
-                onClick={() => onAction(pr, "rejectPullRequest")}
-              >
-                {loadingAction === `rejectPullRequest-${pr.id.toString()}` ? "Rejecting..." : "Reject"}
-              </button>
-            )}
-            {canClose(pr) && (
-              <button
-                type="button"
-                className="ghostButton"
-                disabled={!walletAddress || loadingAction === `closePullRequest-${pr.id.toString()}`}
-                onClick={() => onAction(pr, "closePullRequest")}
-              >
-                {loadingAction === `closePullRequest-${pr.id.toString()}` ? "Closing..." : "Close"}
-              </button>
-            )}
-            {!walletAddress && <span className="helperText">Connect MetaMask to sign.</span>}
-          </div>
-        )}
-      </div>
-
-      {pr.description && <div className="prDetailDescription">{pr.description}</div>}
-
-      <div className="prMetaGrid prDetailMetaGrid">
-        <div>
-          <span>Source repo</span>
-          <strong>{branchLabel(pr.sourceRepoId, pr.sourceBranch)}</strong>
-        </div>
-        <div>
-          <span>Target repo</span>
-          <strong>{branchLabel(pr.targetRepoId, pr.targetBranch)}</strong>
-        </div>
-        <div>
-          <span>Base</span>
-          <strong className="mono">{shortHex(pr.baseCommit)}</strong>
-        </div>
-        <div>
-          <span>Head</span>
-          <strong className="mono">{shortHex(pr.sourceHeadCommit)}</strong>
-        </div>
-      </div>
-
-      <div className="panelHeading prDetailCommitsHeading">
-        <div>
-          <span className="eyebrow">Commits</span>
-          <h3>Included changes</h3>
-        </div>
-        <div className="panelBadge">{commits.length} commits</div>
-      </div>
-      <div className="timeline">
-        {loading && commits.length === 0 && <div className="emptyState">Loading commits...</div>}
-        {!loading && commits.length === 0 && <div className="emptyState">No new commits in this pull request.</div>}
-        {commits.map((commit) => (
-          <article className="timelineItem" key={commit.hash}>
-            <div className="timelineMark" />
-            <div className="timelineBody">
-              <div className="timelineTop">
-                <h4>{commit.message || "(no message)"}</h4>
-                <span className="mono commitHash">{shortHex(commit.hash)}</span>
-              </div>
-              <div className="timelineMeta">
-                <span>{commit.authorName || "Unknown author"}</span>
-                <span>{formatDate(commit.authorDate)}</span>
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function routeFromLocation(
-  pathname: string,
-  search: string,
-): { page: PageState; repoId: bigint | null; branch: string | null; prId: bigint | null } {
-  const prMatch = pathname.match(/^\/projects\/(\d+)\/prs\/(\d+)\/?$/);
-  if (prMatch) {
-    const params = new URLSearchParams(search);
-    return { page: "project", repoId: BigInt(prMatch[1]), branch: params.get("branch"), prId: BigInt(prMatch[2]) };
-  }
-  const match = pathname.match(/^\/projects\/(\d+)\/?$/);
-  if (!match) {
-    return { page: "home", repoId: null, branch: null, prId: null };
-  }
-  const params = new URLSearchParams(search);
-  return { page: "project", repoId: BigInt(match[1]), branch: params.get("branch"), prId: null };
-}
-
-function buildForkCommand(options: {
-  contractAddress: string;
-  repoId: bigint;
-  branch: string;
-  rpcURL: string;
-  ipfsAPI: string;
-}): string {
-  const contract = options.contractAddress || "0xYourContractAddress";
-  return [
-    "bit fork",
-    `bit://local/${contract}/${options.repoId.toString()}`,
-    `--rpc ${options.rpcURL}`,
-    `--contract ${contract}`,
-    `--key <YOUR_PRIVATE_KEY>`,
-    `--ipfs ${options.ipfsAPI}`,
-    `--branch ${options.branch}`,
-  ].join(" ");
-}
-
-function parseOptionalBigInt(value: string): bigint | null {
-  if (!/^\d+$/.test(value.trim())) return null;
-  try {
-    return BigInt(value.trim());
-  } catch {
-    return null;
-  }
-}
-
-function prStatusLabel(status: bigint): string {
-  const label = PR_STATUS_LABELS[Number(status)];
-  return label || "Unknown";
-}
-
-function prStatusChipClass(status: bigint): string {
-  switch (Number(status)) {
-    case 1:
-      return "open";
-    case 2:
-      return "approved";
-    case 3:
-      return "rejected";
-    case 4:
-      return "closed";
-    default:
-      return "";
-  }
-}
-
-function parseAddress(value: string): Address {
-  const normalized = value.trim();
-  if (!/^0x[a-fA-F0-9]{40}$/.test(normalized)) {
-    throw new Error("Contract address must be a 20-byte hex address.");
-  }
-  return normalized as Address;
-}
-
-function bytesHexToString(value: Hex): string {
-  const hex = value.startsWith("0x") ? value.slice(2) : value;
-  let out = "";
-  for (let index = 0; index < hex.length; index += 2) {
-    const code = Number.parseInt(hex.slice(index, index + 2), 16);
-    if (code !== 0) out += String.fromCharCode(code);
-  }
-  return out;
-}
-
-function bytes20HexToGitHash(value: Hex): string {
-  return value.startsWith("0x") ? value.slice(2) : value;
-}
-
-function ipfsURL(gateway: string, cid: string): string {
-  return `${gateway.replace(/\/$/, "")}/${cid}`;
-}
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`IPFS fetch failed (${response.status})`);
-  }
-  return response.json() as Promise<T>;
-}
-
-const manifestCache = new Map<string, Manifest>();
-
-async function getManifest(gateway: string, cid: string): Promise<Manifest> {
-  const cacheKey = `${gateway}|${cid}`;
-  const cached = manifestCache.get(cacheKey);
-  if (cached) return cached;
-  const manifest = await fetchJson<Manifest>(ipfsURL(gateway, cid));
-  manifestCache.set(cacheKey, manifest);
-  return manifest;
-}
-
-function cidV0FromDigest(digestHex: Hex): string {
-  const digest = hexToBytes(digestHex);
-  return base58btcEncode(new Uint8Array([0x12, 0x20, ...digest]));
-}
-
-function hexToBytes(value: Hex): Uint8Array {
-  const hex = value.startsWith("0x") ? value.slice(2) : value;
-  const out = new Uint8Array(hex.length / 2);
-  for (let index = 0; index < out.length; index += 1) {
-    out[index] = Number.parseInt(hex.slice(index * 2, index * 2 + 2), 16);
-  }
-  return out;
-}
-
-function base58btcEncode(bytes: Uint8Array): string {
-  const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-  let value = 0n;
-  for (const byte of bytes) {
-    value = (value << 8n) + BigInt(byte);
-  }
-  let encoded = "";
-  while (value > 0n) {
-    const mod = value % 58n;
-    encoded = alphabet[Number(mod)] + encoded;
-    value /= 58n;
-  }
-  for (const byte of bytes) {
-    if (byte !== 0) break;
-    encoded = alphabet[0] + encoded;
-  }
-  return encoded;
-}
-
-function formatDate(value: string): string {
-  if (!value) return "unknown";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
-}
-
-function formatUnix(value: bigint): string {
-  return new Date(Number(value) * 1000).toLocaleString();
-}
-
-function formatChainId(chainId: string): string {
-  if (!chainId) return "";
-  try {
-    return String(Number.parseInt(chainId, 16));
-  } catch {
-    return chainId;
-  }
-}
-
-function shortAddress(value: string): string {
-  if (!value) return "n/a";
-  return `${value.slice(0, 6)}...${value.slice(-4)}`;
-}
-
-function shortHex(value: string): string {
-  return `${value.slice(0, 8)}...${value.slice(-6)}`;
-}
-
-function roleToLabel(value: bigint): RoleLabel {
-  const index = Number(value);
-  return ROLE_LABELS[index] ?? "None";
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
-function readStoredValue(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredValue(key: string, value: string) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // Ignore storage failures in private mode or restricted environments.
-  }
 }
 
 createRoot(document.getElementById("root")!).render(

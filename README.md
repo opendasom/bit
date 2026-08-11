@@ -118,30 +118,12 @@ bit remote add origin bit://local/0xYourContractAddress/1
 bit pull origin main
 ```
 
-### 5. fork
+### 5. Fork 및 PR 생성/관리 (웹)
 
-다른 사람의 저장소를 fork해서 내 저장소로 만듭니다.
-빈 디렉토리에서 실행하면 `git init`까지 자동으로 처리됩니다.
+웹 explorer에서 현재 브랜치를 새 온체인 저장소로 fork하거나 PR을 생성/승인/거부/닫을 수 있습니다.
 
-```bash
-mkdir my-fork && cd my-fork
-
-bit fork bit://local/0xContractAddress/1 \
-  --rpc http://127.0.0.1:8545 \
-  --contract 0xYourContractAddress \
-  --key YourPrivateKeyHex
-# --branch 생략 시 기본값: main
-```
-
-fork 완료 후 자동으로 설정됩니다:
-- `origin` → 내 fork (새로 생성된 저장소)
-- `upstream` → 원본 저장소
-
-이후 새 커밋을 만들고 `bit push origin`으로 내 fork에 push할 수 있습니다.
-
-### 5-1. PR 생성 및 관리 (웹)
-
-PR 생성/승인/거부/닫기는 웹 explorer에서 처리합니다 (GitHub 방식의 역할 분담: CLI는 push/pull/fork 같은 로컬 작업만 담당).
+- **Fork `<branch>`** 버튼은 현재 브랜치의 온체인 커밋 히스토리와 IPFS CID 포인터를 새 저장소로 복제합니다. 커밋 수만큼 MetaMask 트랜잭션 승인이 필요합니다.
+- fork와 PR 생성/승인/거부/닫기는 모두 웹 explorer에서 MetaMask로 서명합니다.
 
 1. fork 저장소에 새 커밋을 만들고 `bit push origin`으로 push합니다.
 2. 웹에서 **Connect MetaMask** 후 해당 저장소의 **Pull Requests** 탭을 엽니다.
@@ -219,17 +201,6 @@ bit pull <remote> <branch>
 - 로컬 HEAD가 원격 히스토리에 없으면 에러 (diverged).
 - 누락 커밋을 IPFS에서 받아 원본 커밋을 완전히 재구성합니다 (커밋 hash 보존).
 
-### `bit fork`
-
-```
-bit fork <bitURL> [--rpc <url>] [--contract <addr>] [--key <key>] [--ipfs <url>] [--branch <branch>]
-```
-
-- `.git`이 없으면 자동으로 `git init`을 실행합니다.
-- `--rpc/--contract/--key` 생략 시 기존 `.bit/config.json`에서 읽습니다.
-- 원본 저장소(A)의 IPFS diff를 그대로 참조하므로 IPFS 재업로드가 없습니다.
-- fork된 저장소(B)의 체인에는 A와 동일한 IPFS digest 포인터가 기록됩니다.
-
 ---
 
 ## 권한 모델 (BitRegistry)
@@ -256,7 +227,6 @@ bit/
 │   ├── remote.go     # bit remote add
 │   ├── push.go       # bit push
 │   ├── pull.go       # bit pull
-│   └── fork.go       # bit fork (pr 명령은 제거됨 — PR은 웹에서 처리)
 ├── internal/
 │   ├── app/          # 명령 실행 로직 (cmd는 얇은 래퍼)
 │   ├── chain/        # BitRegistry 컨트랙트 연동 (go-ethereum)

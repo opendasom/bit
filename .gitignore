@@ -7,6 +7,7 @@ kubo_v0.27.0_linux-amd64.tar.gz
 
 # 테스트 임시 파일/디렉토리
 test/
+local-test-repo/
 *_test_main.go
 
 # 환경변수 파일 (개인키 등 민감 정보)
@@ -16,6 +17,7 @@ test/
 *.key
 *.env
 .env.*
+!.env.example
 
 # Go 캐시
 *.out
