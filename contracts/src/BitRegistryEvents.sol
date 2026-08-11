@@ -35,7 +35,8 @@ abstract contract BitRegistryEvents is BitRegistryTypes {
         bytes32 sourceBranch,
         bytes20 baseCommit,
         bytes20 sourceHeadCommit,
-        address author
+        address author,
+        bytes description
     );
     event PullRequestApproved(
         uint256 indexed prId,

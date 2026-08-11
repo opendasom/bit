@@ -260,6 +260,7 @@ button:disabled {
   display: grid;
   place-items: center;
   position: relative;
+  overflow: hidden;
 }
 
 .heroVisual::before {
@@ -416,6 +417,121 @@ input:focus {
   background: rgba(124, 211, 156, 0.1);
   color: #8ff0aa;
   border: 1px solid rgba(124, 211, 156, 0.22);
+}
+
+.statusChip.approved {
+  background: rgba(110, 168, 255, 0.1);
+  color: #a5c8ff;
+  border: 1px solid rgba(110, 168, 255, 0.24);
+}
+
+.statusChip.rejected {
+  background: rgba(222, 123, 106, 0.1);
+  color: #ffb3a8;
+  border: 1px solid rgba(222, 123, 106, 0.24);
+}
+
+.statusChip.closed {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(239, 243, 239, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.dangerButton {
+  background: rgba(222, 123, 106, 0.12);
+  border-color: rgba(222, 123, 106, 0.34);
+  color: #ffd8d2;
+  font-weight: 700;
+}
+
+.panelHeadingActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.panelHeadingActions .panelBadge {
+  white-space: nowrap;
+}
+
+.prForm {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(124, 211, 156, 0.2);
+  border-radius: 10px;
+  background: rgba(124, 211, 156, 0.04);
+}
+
+.prFormTitle {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.prFormGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.prFormField {
+  display: grid;
+  gap: 6px;
+}
+
+.prFormField > span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(239, 243, 239, 0.46);
+}
+
+.prFormField select {
+  appearance: none;
+  cursor: pointer;
+}
+
+.prDescriptionInput {
+  resize: vertical;
+  min-height: 88px;
+  line-height: 1.5;
+}
+
+.prFormActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.prFormActions button {
+  min-height: 40px;
+  min-width: 180px;
+}
+
+.prDescription {
+  margin: 2px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(239, 243, 239, 0.78);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .prFormGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .panelHeadingActions {
+    justify-content: flex-start;
+  }
 }
 
 .errorBanner {
@@ -723,6 +839,112 @@ input:focus {
   gap: 12px;
 }
 
+.prOpenButton {
+  appearance: none;
+  display: grid;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  min-width: 0;
+}
+
+.prOpenButton:hover .prTitle {
+  color: #8ff0aa;
+}
+
+.chipGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filterChip {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(239, 243, 239, 0.68);
+}
+
+.filterChip.active {
+  background: rgba(124, 211, 156, 0.12);
+  color: #8ff0aa;
+  border-color: rgba(124, 211, 156, 0.28);
+}
+
+.backButton {
+  min-height: 38px;
+  padding-inline: 14px;
+  margin-bottom: 14px;
+}
+
+.prDetailHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.prDetailTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.prDetailTitle {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.prDetailAuthor {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  color: rgba(239, 243, 239, 0.6);
+  font-size: 12px;
+}
+
+.prDetailAuthor span + span::before {
+  content: "·";
+  margin-right: 12px;
+  color: rgba(239, 243, 239, 0.3);
+}
+
+.prDetailDescription {
+  margin: 14px 0 0;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: rgba(239, 243, 239, 0.82);
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.prDetailMetaGrid {
+  margin-top: 16px;
+}
+
+.prDetailCommitsHeading {
+  margin-top: 22px;
+}
+
 .prHeader,
 .prSubtitle,
 .prActions {
@@ -807,9 +1029,10 @@ input:focus {
 .detailNav {
   display: grid;
   align-content: start;
+  align-self: start;
   gap: 10px;
   position: sticky;
-  top: 24px;
+  top: 88px;
 }
 
 .detailNav .tab {

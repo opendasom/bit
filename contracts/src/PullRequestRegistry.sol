@@ -9,12 +9,17 @@ abstract contract PullRequestRegistry is CommitRegistry {
     mapping(uint256 => PullRequest) private pullRequests;
     mapping(uint256 => uint256[]) private repoPullRequests;
 
+    uint256 public constant MAX_PR_DESCRIPTION_LENGTH = 2048;
+
     function createPullRequest(
         uint256 targetRepoId,
         bytes32 targetBranch,
         uint256 sourceRepoId,
-        bytes32 sourceBranch
+        bytes32 sourceBranch,
+        bytes calldata description
     ) external repoExists(targetRepoId) repoExists(sourceRepoId) returns (uint256 prId) {
+        if (description.length > MAX_PR_DESCRIPTION_LENGTH) revert DescriptionTooLong();
+
         Repo storage targetRepo = repos[targetRepoId];
         Repo storage sourceRepo = repos[sourceRepoId];
         bytes20 baseCommit = targetRepo.branchCommits[targetBranch];
@@ -35,7 +40,8 @@ abstract contract PullRequestRegistry is CommitRegistry {
             author: msg.sender,
             status: PullRequestStatus.Open,
             createdAt: block.timestamp,
-            updatedAt: block.timestamp
+            updatedAt: block.timestamp,
+            description: description
         });
         repoPullRequests[targetRepoId].push(prId);
 
@@ -47,7 +53,8 @@ abstract contract PullRequestRegistry is CommitRegistry {
             sourceBranch,
             baseCommit,
             sourceHeadCommit,
-            msg.sender
+            msg.sender,
+            description
         );
     }
 

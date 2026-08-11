@@ -4,9 +4,11 @@ import {
   createPublicClient,
   createWalletClient,
   custom,
+  hexToString,
   http,
   keccak256,
   stringToBytes,
+  stringToHex,
   type Address,
   type Hex,
 } from "viem";
@@ -62,6 +64,7 @@ type PullRequestSummary = {
   status: bigint;
   createdAt: bigint;
   updatedAt: bigint;
+  description: string;
 };
 
 type Manifest = {
@@ -84,6 +87,14 @@ type EthereumProvider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 };
 
+type PullRequestCreatedLog = {
+  args: { prId?: bigint | null; sourceRepoId?: bigint | null };
+};
+
+type CommitRecordedLog = {
+  args: { commitHash?: Hex; manifestDigest?: Hex };
+};
+
 type PageState = "home" | "project";
 
 declare global {
@@ -97,17 +108,20 @@ const defaultRpcURL = readStoredValue("bit.rpcURL") ?? "https://ethereum-sepolia
 const defaultContract = readStoredValue("bit.contract") ?? "0x34B9D83E03E2E7BF646E2452E0620E2F39cDbeE3";
 const defaultGateway = readStoredValue("bit.ipfsGateway") ?? "https://ipfs.sugang.click/ipfs";
 const defaultIpfsAPI = "http://127.0.0.1:5001";
-const APP_VERSION = "1.0.6";
+const APP_VERSION = "1.1.0";
 const LOG_BLOCK_RANGE = 50_000n;
 const ROLE_LABELS = ["None", "Contributor", "Maintainer", "Owner"] as const;
 type RoleLabel = (typeof ROLE_LABELS)[number];
+const PR_STATUS_LABELS = ["", "Open", "Approved", "Rejected", "Closed"] as const;
 
 function App() {
   const initialRoute = routeFromLocation(window.location.pathname, window.location.search);
   const [page, setPage] = useState<PageState>(initialRoute.page);
   const [selectedRepoId, setSelectedRepoId] = useState<bigint | null>(initialRoute.repoId);
   const [selectedBranch, setSelectedBranch] = useState<string>(initialRoute.branch ?? "");
-  const [activeTab, setActiveTab] = useState<"commits" | "prs">("commits");
+  const [selectedPrId, setSelectedPrId] = useState<bigint | null>(initialRoute.prId);
+  const [activeTab, setActiveTab] = useState<"commits" | "prs">(initialRoute.prId ? "prs" : "commits");
+  const [prFilter, setPrFilter] = useState<"open" | "all">("open");
   const [rpcURL, setRpcURL] = useState(defaultRpcURL);
   const [contractAddress, setContractAddress] = useState(defaultContract);
   const [ipfsGateway, setIpfsGateway] = useState(defaultGateway);
@@ -123,12 +137,26 @@ function App() {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
   const [error, setError] = useState("");
+  const [showCreatePr, setShowCreatePr] = useState(false);
+  const [newPrTargetRepoId, setNewPrTargetRepoId] = useState("");
+  const [newPrTargetBranch, setNewPrTargetBranch] = useState("");
+  const [newPrSourceBranch, setNewPrSourceBranch] = useState("");
+  const [newPrDescription, setNewPrDescription] = useState("");
+  const [roleByTargetRepo, setRoleByTargetRepo] = useState<Map<string, RoleLabel>>(new Map());
+  const [prDetailCommits, setPrDetailCommits] = useState<CommitSummary[]>([]);
 
   const publicClient = useMemo(() => createPublicClient({ transport: http(rpcURL) }), [rpcURL]);
   const selectedRepo = repos.find((repo) => repo.id === selectedRepoId) ?? null;
   const autoLoadedRouteRef = useRef<string | null>(null);
   const detailRepo =
     selectedRepo ?? (selectedRepoId ? { id: selectedRepoId, owner: "0x0000000000000000000000000000000000000000" as Address, metadataCID: "", metadata: null } : null);
+  const repoNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const repo of repos) {
+      map.set(repo.id.toString(), repo.metadata?.name || `Repo #${repo.id.toString()}`);
+    }
+    return map;
+  }, [repos]);
   const branchNameByHash = useMemo(() => {
     const map = new Map<string, string>();
     for (const branch of branches) {
@@ -143,7 +171,8 @@ function App() {
       setPage(nextRoute.page);
       setSelectedRepoId(nextRoute.repoId);
       setSelectedBranch(nextRoute.branch ?? "");
-      setActiveTab("commits");
+      setSelectedPrId(nextRoute.prId);
+      setActiveTab(nextRoute.prId ? "prs" : "commits");
       setCopyState("idle");
 
       if (nextRoute.page === "home") {
@@ -179,6 +208,17 @@ function App() {
     void loadRepoDetail(selectedRepoId, repos, branch);
   }, [page, repos, selectedRepoId, selectedBranch, contractAddress]);
 
+  useEffect(() => {
+    if (selectedPrId === null) {
+      setPrDetailCommits([]);
+      return;
+    }
+    const pr = pullRequests.find((item) => item.id === selectedPrId);
+    if (!pr) return;
+    void loadPullRequestDetail(pr);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPrId, pullRequests]);
+
   async function loadRepos() {
     setLoadingRepos(true);
     setError("");
@@ -211,6 +251,8 @@ function App() {
       setPage("home");
       setSelectedRepoId(null);
       setSelectedBranch("");
+      setSelectedPrId(null);
+      setPrFilter("open");
       setActiveTab("commits");
       setCommits([]);
       setPullRequests([]);
@@ -232,9 +274,11 @@ function App() {
     setPage("project");
     setSelectedRepoId(repoId);
     setSelectedBranch(branch);
+    setSelectedPrId(null);
+    setPrFilter("open");
     setActiveTab("commits");
     setCopyState("idle");
-    autoLoadedRouteRef.current = `${repoId.toString()}:${branch}`;
+    autoLoadedRouteRef.current = `${contractAddress}:${repoId.toString()}:${branch}`;
     await loadRepoDetail(repoId, repos, branch);
   }
 
@@ -243,6 +287,8 @@ function App() {
     setPage("home");
     setSelectedRepoId(null);
     setSelectedBranch("");
+    setSelectedPrId(null);
+    setPrFilter("open");
     setActiveTab("commits");
     setCopyState("idle");
     setCommits([]);
@@ -307,6 +353,7 @@ function App() {
       );
 
       setCommits(nextCommits.reverse());
+      setRoleByTargetRepo(new Map());
       await loadRepoPullRequests(repoId);
 
       try {
@@ -335,14 +382,14 @@ function App() {
   async function loadRepoPullRequests(repoId: bigint, repoLookup: RepoSummary[] = repos) {
     try {
       const address = parseAddress(contractAddress);
+      const prIds = new Set<string>();
+
       const prCount = (await publicClient.readContract({
         address,
         abi,
         functionName: "getRepoPullRequestCount",
         args: [repoId],
       })) as bigint;
-
-      const nextPullRequests: PullRequestSummary[] = [];
       for (let index = 0n; index < prCount; index++) {
         const prId = (await publicClient.readContract({
           address,
@@ -350,13 +397,33 @@ function App() {
           functionName: "getRepoPullRequestAt",
           args: [repoId, index],
         })) as bigint;
+        prIds.add(prId.toString());
+      }
+
+      const latestBlock = await publicClient.getBlockNumber({ cacheTime: 0 });
+      for (let fromBlock = 0n; fromBlock <= latestBlock; fromBlock += LOG_BLOCK_RANGE) {
+        const toBlock = fromBlock + LOG_BLOCK_RANGE - 1n > latestBlock ? latestBlock : fromBlock + LOG_BLOCK_RANGE - 1n;
+        const logs = (await publicClient.getContractEvents({
+          address,
+          abi,
+          eventName: "PullRequestCreated",
+          args: { sourceRepoId: repoId },
+          fromBlock,
+          toBlock,
+        })) as unknown as PullRequestCreatedLog[];
+        for (const log of logs) {
+          if (log.args.prId != null) prIds.add(log.args.prId.toString());
+        }
+      }
+
+      const nextPullRequests: PullRequestSummary[] = [];
+      for (const prId of prIds) {
         const pr = (await publicClient.readContract({
           address,
           abi,
           functionName: "getPullRequest",
-          args: [prId],
+          args: [BigInt(prId)],
         })) as PullRequestSummary;
-        if (BigInt(pr.status as number | bigint) !== 1n) continue;
         nextPullRequests.push({
           id: pr.id,
           targetRepoId: pr.targetRepoId,
@@ -369,9 +436,26 @@ function App() {
           status: BigInt(pr.status as number | bigint),
           createdAt: pr.createdAt,
           updatedAt: pr.updatedAt,
+          description: pr.description ? hexToString(pr.description as Hex) : "",
         });
       }
+      nextPullRequests.sort((left, right) => (left.id < right.id ? 1 : left.id > right.id ? -1 : 0));
       setPullRequests(nextPullRequests);
+
+      if (walletAddress) {
+        const targetRepoIds = new Set(nextPullRequests.map((pr) => pr.targetRepoId.toString()));
+        const roles = new Map<string, RoleLabel>();
+        for (const targetRepoId of targetRepoIds) {
+          const role = (await publicClient.readContract({
+            address,
+            abi,
+            functionName: "getRole",
+            args: [BigInt(targetRepoId), walletAddress],
+          })) as bigint;
+          roles.set(targetRepoId, roleToLabel(role));
+        }
+        setRoleByTargetRepo(roles);
+      }
     } catch (err) {
       setError(errorMessage(err));
     }
@@ -380,31 +464,31 @@ function App() {
   async function loadRepoBranches(repoId: bigint, repoLookup: RepoSummary[] = repos, defaultBranch = "main") {
     try {
       const repo = repoLookup.find((item) => item.id === repoId) ?? selectedRepo;
-      const latestBlock = await publicClient.getBlockNumber();
-      const logs = [];
+      const latestBlock = await publicClient.getBlockNumber({ cacheTime: 0 });
+      const logs: CommitRecordedLog[] = [];
       for (let fromBlock = 0n; fromBlock <= latestBlock; fromBlock += LOG_BLOCK_RANGE) {
         const toBlock = fromBlock + LOG_BLOCK_RANGE - 1n > latestBlock ? latestBlock : fromBlock + LOG_BLOCK_RANGE - 1n;
-        const page = await publicClient.getContractEvents({
+        const page = (await publicClient.getContractEvents({
           address: parseAddress(contractAddress),
           abi,
           eventName: "CommitRecorded",
           args: { repoId },
           fromBlock,
           toBlock,
-        });
+        })) as unknown as CommitRecordedLog[];
         logs.push(...page);
       }
 
       const nextBranches = new Map<string, BranchSummary>();
       for (const log of logs) {
-        const manifestCID = cidV0FromDigest(log.args.manifestDigest);
+        const manifestCID = cidV0FromDigest(log.args.manifestDigest!);
         const manifest = await getManifest(ipfsGateway, manifestCID);
         const branchName = manifest.branch || defaultBranch || repo?.metadata?.defaultBranch || "main";
         nextBranches.set(branchName, {
           name: branchName,
           branchHash: keccak256(stringToBytes(branchName)),
           commitCount: (nextBranches.get(branchName)?.commitCount ?? 0) + 1,
-          headCommit: bytes20HexToGitHash(log.args.commitHash),
+          headCommit: bytes20HexToGitHash(log.args.commitHash!),
         });
       }
 
@@ -434,12 +518,18 @@ function App() {
       setWalletAddress(accounts[0] as Address);
       setWalletChainId(chainId);
       setError("");
+      if (page === "project" && selectedRepoId) {
+        void loadRepoDetail(selectedRepoId);
+      }
     } catch (err) {
       setError(errorMessage(err));
     }
   }
 
-  async function approvePullRequest(prId: bigint) {
+  async function runPullRequestAction(
+    prId: bigint,
+    functionName: "approvePullRequest" | "rejectPullRequest" | "closePullRequest",
+  ) {
     if (!window.ethereum) {
       setError("MetaMask가 필요합니다.");
       return;
@@ -453,7 +543,7 @@ function App() {
       return;
     }
 
-    setLoadingAction(`approve-${prId.toString()}`);
+    setLoadingAction(`${functionName}-${prId.toString()}`);
     setError("");
     try {
       const chainId = (await window.ethereum.request({ method: "eth_chainId" })) as string;
@@ -470,15 +560,168 @@ function App() {
       const txHash = await walletClient.writeContract({
         address,
         abi,
-        functionName: "approvePullRequest",
+        functionName,
         args: [prId],
       });
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+      if (receipt.status !== "success") {
+        setError("트랜잭션이 revert 되었습니다. 대상 브랜치가 이동했거나 권한이 없는지 확인하세요.");
+        return;
+      }
       await loadRepoDetail(selectedRepoId);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setLoadingAction(null);
+    }
+  }
+
+  async function createPullRequest() {
+    if (!window.ethereum) {
+      setError("MetaMask가 필요합니다.");
+      return;
+    }
+    if (!walletAddress) {
+      setError("먼저 MetaMask를 연결하세요.");
+      return;
+    }
+    if (!selectedRepoId) {
+      setError("선택된 프로젝트가 없습니다.");
+      return;
+    }
+    const targetRepoId = parseOptionalBigInt(newPrTargetRepoId);
+    if (targetRepoId === null || targetRepoId < 1n) {
+      setError("대상 저장소를 선택하세요.");
+      return;
+    }
+    const targetBranch = newPrTargetBranch.trim();
+    const sourceBranch = newPrSourceBranch.trim();
+    if (!targetBranch || !sourceBranch) {
+      setError("대상 브랜치와 소스 브랜치를 입력하세요.");
+      return;
+    }
+    if (newPrDescription.length > 2048) {
+      setError("설명은 2048자 이하여야 합니다.");
+      return;
+    }
+
+    setLoadingAction("create-pr");
+    setError("");
+    try {
+      const chainId = (await window.ethereum.request({ method: "eth_chainId" })) as string;
+      if (Number.parseInt(chainId, 16) !== sepolia.id) {
+        setError("MetaMask network를 Sepolia로 변경하세요.");
+        return;
+      }
+      const address = parseAddress(contractAddress);
+      const walletClient = createWalletClient({
+        account: walletAddress,
+        chain: sepolia,
+        transport: custom(window.ethereum),
+      });
+      const txHash = await walletClient.writeContract({
+        address,
+        abi,
+        functionName: "createPullRequest",
+        args: [
+          targetRepoId,
+          keccak256(stringToBytes(targetBranch)),
+          selectedRepoId,
+          keccak256(stringToBytes(sourceBranch)),
+          stringToHex(newPrDescription),
+        ],
+      });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+      if (receipt.status !== "success") {
+        setError("PR 생성 트랜잭션이 revert 되었습니다. 대상 브랜치가 앞서 나갔거나 새 커밋이 없는지 확인하세요.");
+        return;
+      }
+      setShowCreatePr(false);
+      setNewPrDescription("");
+      await loadRepoDetail(selectedRepoId);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setLoadingAction(null);
+    }
+  }
+
+  function openPrDetail(pr: PullRequestSummary) {
+    if (!selectedRepoId) return;
+    const nextPath = `/projects/${selectedRepoId.toString()}/prs/${pr.id.toString()}?branch=${encodeURIComponent(selectedBranch)}`;
+    window.history.pushState({}, "", nextPath);
+    setSelectedPrId(pr.id);
+    setActiveTab("prs");
+  }
+
+  function closePrDetail() {
+    if (!selectedRepoId) return;
+    const nextPath = `/projects/${selectedRepoId.toString()}?branch=${encodeURIComponent(selectedBranch)}`;
+    window.history.pushState({}, "", nextPath);
+    setSelectedPrId(null);
+    setActiveTab("prs");
+  }
+
+  async function loadPullRequestDetail(pr: PullRequestSummary) {
+    setLoadingDetail(true);
+    setError("");
+    try {
+      const address = parseAddress(contractAddress);
+      const historyLength = (await publicClient.readContract({
+        address,
+        abi,
+        functionName: "getBranchHistoryLength",
+        args: [pr.sourceRepoId, pr.sourceBranch],
+      })) as bigint;
+      if (historyLength === 0n) {
+        setPrDetailCommits([]);
+        return;
+      }
+      const [hashes, , manifestDigests] = (await publicClient.readContract({
+        address,
+        abi,
+        functionName: "getBranchCommitsWithMetadata",
+        args: [pr.sourceRepoId, pr.sourceBranch, 0n, historyLength],
+      })) as [Hex[], Hex[], Hex[], Hex[]];
+
+      const baseHex = pr.baseCommit.toLowerCase();
+      let baseIndex = -1;
+      for (let index = 0; index < hashes.length; index++) {
+        if (hashes[index].toLowerCase() === baseHex) {
+          baseIndex = index;
+          break;
+        }
+      }
+      const start = baseIndex + 1;
+      if (start >= hashes.length) {
+        setPrDetailCommits([]);
+        return;
+      }
+
+      const nextCommits: CommitSummary[] = [];
+      for (let index = start; index < hashes.length; index++) {
+        const manifestCID = cidV0FromDigest(manifestDigests[index]);
+        const manifest = await getManifest(ipfsGateway, manifestCID);
+        nextCommits.push({
+          hash: bytes20HexToGitHash(hashes[index]),
+          treeHash: "",
+          updater: "0x0000000000000000000000000000000000000000" as Address,
+          chainTimestamp: 0n,
+          message: manifest.message ?? "",
+          authorName: manifest.author?.name ?? "",
+          authorEmail: manifest.author?.email ?? "",
+          authorDate: manifest.author?.date ?? "",
+          committerName: manifest.committer?.name ?? "",
+          committerEmail: manifest.committer?.email ?? "",
+          committerDate: manifest.committer?.date ?? "",
+          parents: manifest.parentCommits ?? [],
+        });
+      }
+      setPrDetailCommits(nextCommits);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setLoadingDetail(false);
     }
   }
 
@@ -501,6 +744,27 @@ function App() {
       setError(errorMessage(err));
     }
   }
+
+  function branchLabel(repoId: bigint, branchHash: Hex): string {
+    const branchName = branchNameByHash.get(branchHash.toLowerCase());
+    if (branchName) return branchName;
+    return repoNameById.get(repoId.toString()) ?? `Repo #${repoId.toString()}`;
+  }
+
+  function canManagePullRequest(pr: PullRequestSummary): boolean {
+    const role = roleByTargetRepo.get(pr.targetRepoId.toString()) ?? "None";
+    return role === "Maintainer" || role === "Owner";
+  }
+
+  function canClosePullRequest(pr: PullRequestSummary): boolean {
+    if (pr.author.toLowerCase() === walletAddress?.toLowerCase()) return true;
+    return canManagePullRequest(pr);
+  }
+
+  const visiblePullRequests = useMemo(
+    () => (prFilter === "open" ? pullRequests.filter((pr) => pr.status === 1n) : pullRequests),
+    [prFilter, pullRequests],
+  );
 
   const walletSummary = walletAddress ? `${shortAddress(walletAddress)} · ${formatChainId(walletChainId)}` : "";
   const contractSummary = contractAddress ? shortAddress(contractAddress) : "n/a";
@@ -687,12 +951,13 @@ function App() {
                           type="button"
                           className={branch.name === selectedBranch ? "branchItem active" : "branchItem"}
                           onClick={() => {
-                            const nextPath = `/projects/${selectedRepo.id.toString()}?branch=${encodeURIComponent(branch.name)}`;
+                            const nextPath = `/projects/${detailRepo.id.toString()}?branch=${encodeURIComponent(branch.name)}`;
                             window.history.pushState({}, "", nextPath);
                             setSelectedBranch(branch.name);
+                            setSelectedPrId(null);
                             setCopyState("idle");
-                            autoLoadedRouteRef.current = `${selectedRepo.id.toString()}:${branch.name}`;
-                            void loadRepoDetail(selectedRepo.id, repos, branch.name);
+                            autoLoadedRouteRef.current = `${contractAddress}:${detailRepo.id.toString()}:${branch.name}`;
+                            void loadRepoDetail(detailRepo.id, repos, branch.name);
                           }}
                         >
                           <div className="branchItemTop">
@@ -733,33 +998,151 @@ function App() {
 
               {activeTab === "prs" && (
                 <section className="detailGrid">
+                  {selectedPrId !== null ? (
+                    <PrDetailView
+                      pr={pullRequests.find((item) => item.id === selectedPrId) ?? null}
+                      commits={prDetailCommits}
+                      loading={loadingDetail}
+                      walletAddress={walletAddress}
+                      loadingAction={loadingAction}
+                      branchLabel={branchLabel}
+                      canManage={canManagePullRequest}
+                      canClose={canClosePullRequest}
+                      onBack={() => closePrDetail()}
+                      onAction={(pr, action) => void runPullRequestAction(pr.id, action)}
+                    />
+                  ) : (
+                  <>
                   <div className="panel panelTall">
                     <div className="panelHeading">
                       <div>
                         <span className="eyebrow">Pull Requests</span>
-                        <h3>Open PRs</h3>
+                        <h3>PRs</h3>
                       </div>
-                      <div className="panelBadge">{pullRequests.length} active</div>
+                      <div className="panelHeadingActions">
+                        <div className="chipGroup">
+                          <button
+                            type="button"
+                            className={prFilter === "open" ? "filterChip active" : "filterChip"}
+                            onClick={() => setPrFilter("open")}
+                          >
+                            Open
+                          </button>
+                          <button
+                            type="button"
+                            className={prFilter === "all" ? "filterChip active" : "filterChip"}
+                            onClick={() => setPrFilter("all")}
+                          >
+                            All
+                          </button>
+                          <div className="panelBadge">
+                            {prFilter === "open" ? pullRequests.filter((pr) => pr.status === 1n).length : pullRequests.length} shown
+                          </div>
+                        </div>
+                        <button type="button" className="ghostButton" onClick={() => setShowCreatePr((value) => !value)}>
+                          {showCreatePr ? "Cancel" : "New pull request"}
+                        </button>
+                      </div>
                     </div>
+
+                    {showCreatePr && (
+                      <div className="prForm">
+                        <div className="prFormTitle">Create pull request</div>
+                        <div className="prFormGrid">
+                          <label className="prFormField">
+                            <span>Source repo</span>
+                            <input className="headerInput mono" value={detailRepo.metadata?.name || `Repo #${detailRepo.id.toString()}`} readOnly disabled />
+                          </label>
+                          <label className="prFormField">
+                            <span>Source branch</span>
+                            <select
+                              className="headerInput mono"
+                              value={newPrSourceBranch}
+                              onChange={(event) => setNewPrSourceBranch(event.target.value)}
+                            >
+                              <option value="">Select branch...</option>
+                              {branches.map((branch) => (
+                                <option key={branch.branchHash} value={branch.name}>
+                                  {branch.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="prFormField">
+                            <span>Target repo</span>
+                            <select
+                              className="headerInput mono"
+                              value={newPrTargetRepoId}
+                              onChange={(event) => {
+                                setNewPrTargetRepoId(event.target.value);
+                                if (event.target.value) {
+                                  const target = repos.find((repo) => repo.id === BigInt(event.target.value));
+                                  setNewPrTargetBranch(target?.metadata?.defaultBranch || "main");
+                                }
+                              }}
+                            >
+                              <option value="">Select repo...</option>
+                              {repos.map((repo) => (
+                                <option key={repo.id.toString()} value={repo.id.toString()}>
+                                  {repo.metadata?.name || `Repo #${repo.id.toString()}`} (#{repo.id.toString()})
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="prFormField">
+                            <span>Target branch</span>
+                            <input
+                              className="headerInput mono"
+                              value={newPrTargetBranch}
+                              onChange={(event) => setNewPrTargetBranch(event.target.value)}
+                              placeholder="main"
+                            />
+                          </label>
+                        </div>
+                        <label className="prFormField">
+                          <span>Description</span>
+                          <textarea
+                            className="headerInput prDescriptionInput"
+                            value={newPrDescription}
+                            onChange={(event) => setNewPrDescription(event.target.value)}
+                            placeholder="What does this pull request change?"
+                            rows={4}
+                          />
+                        </label>
+                        <div className="prFormActions">
+                          <button
+                            type="button"
+                            className="primaryButton"
+                            disabled={!walletAddress || loadingAction === "create-pr"}
+                            onClick={() => void createPullRequest()}
+                          >
+                            {loadingAction === "create-pr" ? "Creating..." : "Create pull request"}
+                          </button>
+                          {!walletAddress && <span className="helperText">Connect MetaMask to sign.</span>}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="prList">
-                      {loadingDetail && pullRequests.length === 0 && <div className="emptyState">Loading pull requests...</div>}
-                      {pullRequests.length === 0 && !loadingDetail && <div className="emptyState">No open pull requests.</div>}
-                      {pullRequests.map((pr) => (
+                      {loadingDetail && visiblePullRequests.length === 0 && <div className="emptyState">Loading pull requests...</div>}
+                      {visiblePullRequests.length === 0 && !loadingDetail && <div className="emptyState">No pull requests yet.</div>}
+                      {visiblePullRequests.map((pr) => (
                         <article className="prCard" key={pr.id.toString()}>
                           <div className="prHeader">
-                            <div>
+                            <button type="button" className="prOpenButton" onClick={() => openPrDetail(pr)}>
                               <div className="prTitle">#{pr.id.toString()}</div>
                               <div className="prSubtitle">
                                 <span className="mono">
-                                  from {branchNameByHash.get(pr.sourceBranch.toLowerCase()) ?? `#${pr.sourceRepoId.toString()}`}
+                                  from {branchLabel(pr.sourceRepoId, pr.sourceBranch)}
                                 </span>
                                 <span className="mono">
-                                  to {branchNameByHash.get(pr.targetBranch.toLowerCase()) ?? `#${pr.targetRepoId.toString()}`}
+                                  to {branchLabel(pr.targetRepoId, pr.targetBranch)}
                                 </span>
                               </div>
-                            </div>
-                            <span className="statusChip open">OPEN</span>
+                            </button>
+                            <span className={`statusChip ${prStatusChipClass(pr.status)}`}>{prStatusLabel(pr.status)}</span>
                           </div>
+                          {pr.description && <div className="prDescription">{pr.description}</div>}
                           <div className="prMetaGrid">
                             <div>
                               <span>Author</span>
@@ -778,17 +1161,44 @@ function App() {
                               <strong className="mono">{shortHex(pr.sourceHeadCommit)}</strong>
                             </div>
                           </div>
-                          <div className="prActions">
-                            <button
-                              type="button"
-                              className="primaryButton"
-                              disabled={!walletAddress || loadingAction === `approve-${pr.id.toString()}`}
-                              onClick={() => void approvePullRequest(pr.id)}
-                            >
-                              {loadingAction === `approve-${pr.id.toString()}` ? "Approving..." : "Approve"}
-                            </button>
-                            {!walletAddress && <span className="helperText">Connect MetaMask to sign.</span>}
-                          </div>
+                          {pr.status === 1n && (
+                            <div className="prActions">
+                              {canManagePullRequest(pr) && (
+                                <button
+                                  type="button"
+                                  className="primaryButton"
+                                  disabled={!walletAddress || loadingAction === `approvePullRequest-${pr.id.toString()}`}
+                                  onClick={() => void runPullRequestAction(pr.id, "approvePullRequest")}
+                                >
+                                  {loadingAction === `approvePullRequest-${pr.id.toString()}` ? "Approving..." : "Approve"}
+                                </button>
+                              )}
+                              {canManagePullRequest(pr) && (
+                                <button
+                                  type="button"
+                                  className="dangerButton"
+                                  disabled={!walletAddress || loadingAction === `rejectPullRequest-${pr.id.toString()}`}
+                                  onClick={() => void runPullRequestAction(pr.id, "rejectPullRequest")}
+                                >
+                                  {loadingAction === `rejectPullRequest-${pr.id.toString()}` ? "Rejecting..." : "Reject"}
+                                </button>
+                              )}
+                              {canClosePullRequest(pr) && (
+                                <button
+                                  type="button"
+                                  className="ghostButton"
+                                  disabled={!walletAddress || loadingAction === `closePullRequest-${pr.id.toString()}`}
+                                  onClick={() => void runPullRequestAction(pr.id, "closePullRequest")}
+                                >
+                                  {loadingAction === `closePullRequest-${pr.id.toString()}` ? "Closing..." : "Close"}
+                                </button>
+                              )}
+                              {!walletAddress && <span className="helperText">Connect MetaMask to sign.</span>}
+                              {walletAddress && !canManagePullRequest(pr) && !canClosePullRequest(pr) && (
+                                <span className="helperText">Owner or Maintainer of the target repo can manage this PR.</span>
+                              )}
+                            </div>
+                          )}
                         </article>
                       ))}
                     </div>
@@ -819,8 +1229,10 @@ function App() {
                         <strong>{formatChainId(walletChainId) || "unknown"}</strong>
                       </div>
                     </div>
-                    <p className="helperText">Approve opens MetaMask and submits the transaction for the connected account.</p>
+                    <p className="helperText">Create, approve, reject and close open MetaMask and submit the transaction for the connected account.</p>
                   </aside>
+                  </>
+                )}
                 </section>
               )}
             </div>
@@ -835,16 +1247,153 @@ function App() {
   );
 }
 
+function PrDetailView(props: {
+  pr: PullRequestSummary | null;
+  commits: CommitSummary[];
+  loading: boolean;
+  walletAddress: Address | null;
+  loadingAction: string | null;
+  branchLabel: (repoId: bigint, branchHash: Hex) => string;
+  canManage: (pr: PullRequestSummary) => boolean;
+  canClose: (pr: PullRequestSummary) => boolean;
+  onBack: () => void;
+  onAction: (pr: PullRequestSummary, action: "approvePullRequest" | "rejectPullRequest" | "closePullRequest") => void;
+}) {
+  const { pr, commits, loading, walletAddress, loadingAction, branchLabel, canManage, canClose, onBack, onAction } = props;
+  if (!pr) {
+    return (
+      <div className="panel panelTall">
+        <button type="button" className="ghostButton backButton" onClick={onBack}>
+          &larr; All pull requests
+        </button>
+        <div className="emptyState">Pull request not found.</div>
+      </div>
+    );
+  }
+
+  const titleLine = pr.description.split("\n")[0].trim() || "(no description)";
+
+  return (
+    <div className="panel panelTall">
+      <button type="button" className="ghostButton backButton" onClick={onBack}>
+        &larr; All pull requests
+      </button>
+
+      <div className="prDetailHeader">
+        <div>
+          <div className="prDetailTitleRow">
+            <span className={`statusChip ${prStatusChipClass(pr.status)}`}>{prStatusLabel(pr.status)}</span>
+            <h3 className="prDetailTitle">#{pr.id.toString()} · {titleLine}</h3>
+          </div>
+          <div className="prDetailAuthor">
+            <span className="mono">{shortAddress(pr.author)}</span>
+            <span>opened {formatUnix(pr.createdAt)}</span>
+            <span>updated {formatUnix(pr.updatedAt)}</span>
+          </div>
+        </div>
+        {pr.status === 1n && (
+          <div className="prActions">
+            {canManage(pr) && (
+              <button
+                type="button"
+                className="primaryButton"
+                disabled={!walletAddress || loadingAction === `approvePullRequest-${pr.id.toString()}`}
+                onClick={() => onAction(pr, "approvePullRequest")}
+              >
+                {loadingAction === `approvePullRequest-${pr.id.toString()}` ? "Approving..." : "Approve"}
+              </button>
+            )}
+            {canManage(pr) && (
+              <button
+                type="button"
+                className="dangerButton"
+                disabled={!walletAddress || loadingAction === `rejectPullRequest-${pr.id.toString()}`}
+                onClick={() => onAction(pr, "rejectPullRequest")}
+              >
+                {loadingAction === `rejectPullRequest-${pr.id.toString()}` ? "Rejecting..." : "Reject"}
+              </button>
+            )}
+            {canClose(pr) && (
+              <button
+                type="button"
+                className="ghostButton"
+                disabled={!walletAddress || loadingAction === `closePullRequest-${pr.id.toString()}`}
+                onClick={() => onAction(pr, "closePullRequest")}
+              >
+                {loadingAction === `closePullRequest-${pr.id.toString()}` ? "Closing..." : "Close"}
+              </button>
+            )}
+            {!walletAddress && <span className="helperText">Connect MetaMask to sign.</span>}
+          </div>
+        )}
+      </div>
+
+      {pr.description && <div className="prDetailDescription">{pr.description}</div>}
+
+      <div className="prMetaGrid prDetailMetaGrid">
+        <div>
+          <span>Source repo</span>
+          <strong>{branchLabel(pr.sourceRepoId, pr.sourceBranch)}</strong>
+        </div>
+        <div>
+          <span>Target repo</span>
+          <strong>{branchLabel(pr.targetRepoId, pr.targetBranch)}</strong>
+        </div>
+        <div>
+          <span>Base</span>
+          <strong className="mono">{shortHex(pr.baseCommit)}</strong>
+        </div>
+        <div>
+          <span>Head</span>
+          <strong className="mono">{shortHex(pr.sourceHeadCommit)}</strong>
+        </div>
+      </div>
+
+      <div className="panelHeading prDetailCommitsHeading">
+        <div>
+          <span className="eyebrow">Commits</span>
+          <h3>Included changes</h3>
+        </div>
+        <div className="panelBadge">{commits.length} commits</div>
+      </div>
+      <div className="timeline">
+        {loading && commits.length === 0 && <div className="emptyState">Loading commits...</div>}
+        {!loading && commits.length === 0 && <div className="emptyState">No new commits in this pull request.</div>}
+        {commits.map((commit) => (
+          <article className="timelineItem" key={commit.hash}>
+            <div className="timelineMark" />
+            <div className="timelineBody">
+              <div className="timelineTop">
+                <h4>{commit.message || "(no message)"}</h4>
+                <span className="mono commitHash">{shortHex(commit.hash)}</span>
+              </div>
+              <div className="timelineMeta">
+                <span>{commit.authorName || "Unknown author"}</span>
+                <span>{formatDate(commit.authorDate)}</span>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function routeFromLocation(
   pathname: string,
   search: string,
-): { page: PageState; repoId: bigint | null; branch: string | null } {
+): { page: PageState; repoId: bigint | null; branch: string | null; prId: bigint | null } {
+  const prMatch = pathname.match(/^\/projects\/(\d+)\/prs\/(\d+)\/?$/);
+  if (prMatch) {
+    const params = new URLSearchParams(search);
+    return { page: "project", repoId: BigInt(prMatch[1]), branch: params.get("branch"), prId: BigInt(prMatch[2]) };
+  }
   const match = pathname.match(/^\/projects\/(\d+)\/?$/);
   if (!match) {
-    return { page: "home", repoId: null, branch: null };
+    return { page: "home", repoId: null, branch: null, prId: null };
   }
   const params = new URLSearchParams(search);
-  return { page: "project", repoId: BigInt(match[1]), branch: params.get("branch") };
+  return { page: "project", repoId: BigInt(match[1]), branch: params.get("branch"), prId: null };
 }
 
 function buildForkCommand(options: {
@@ -864,6 +1413,35 @@ function buildForkCommand(options: {
     `--ipfs ${options.ipfsAPI}`,
     `--branch ${options.branch}`,
   ].join(" ");
+}
+
+function parseOptionalBigInt(value: string): bigint | null {
+  if (!/^\d+$/.test(value.trim())) return null;
+  try {
+    return BigInt(value.trim());
+  } catch {
+    return null;
+  }
+}
+
+function prStatusLabel(status: bigint): string {
+  const label = PR_STATUS_LABELS[Number(status)];
+  return label || "Unknown";
+}
+
+function prStatusChipClass(status: bigint): string {
+  switch (Number(status)) {
+    case 1:
+      return "open";
+    case 2:
+      return "approved";
+    case 3:
+      return "rejected";
+    case 4:
+      return "closed";
+    default:
+      return "";
+  }
 }
 
 function parseAddress(value: string): Address {

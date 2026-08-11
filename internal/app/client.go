@@ -24,7 +24,6 @@ type ChainClient interface {
 		diffDigest [32]byte,
 	) error
 	CreateRepo(metadataCID string) (*big.Int, error)
-	CreatePullRequest(targetRepoID *big.Int, targetBranch string, sourceRepoID *big.Int, sourceBranch string) (*big.Int, error)
 }
 
 // IPFSClient is the subset of ipfs.Client's methods that app-level commands

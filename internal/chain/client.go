@@ -278,45 +278,6 @@ func (c *Client) RecordCommit(
 	return err
 }
 
-func (c *Client) CreatePullRequest(
-	targetRepoID *big.Int,
-	targetBranch string,
-	sourceRepoID *big.Int,
-	sourceBranch string,
-) (*big.Int, error) {
-	tx, err := c.contract.Transact(
-		c.auth,
-		"createPullRequest",
-		targetRepoID,
-		branchNameToBytes32(targetBranch),
-		sourceRepoID,
-		branchNameToBytes32(sourceBranch),
-	)
-	if err != nil {
-		return nil, err
-	}
-	receipt, err := c.waitSuccessful(tx)
-	if err != nil {
-		return nil, err
-	}
-
-	parsedABI, err := loadArtifactABI()
-	if err != nil {
-		return nil, err
-	}
-	event, ok := parsedABI.Events["PullRequestCreated"]
-	if !ok {
-		return nil, errors.New("PullRequestCreated event missing from ABI")
-	}
-	for _, log := range receipt.Logs {
-		if log.Address == c.contractAddress && len(log.Topics) > 1 && log.Topics[0] == event.ID {
-			return new(big.Int).SetBytes(log.Topics[1].Bytes()), nil
-		}
-	}
-
-	return nil, errors.New("PullRequestCreated event not found in transaction receipt")
-}
-
 // CreateRepo는 체인에 새 저장소를 생성하고 repoId를 반환한다.
 func (c *Client) CreateRepo(metadataCID string) (*big.Int, error) {
 	tx, err := c.contract.Transact(c.auth, "createRepo", []byte(metadataCID))
