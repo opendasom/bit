@@ -4,6 +4,7 @@ import {
   createPublicClient,
   createWalletClient,
   custom,
+  decodeEventLog,
   hexToString,
   http,
   keccak256,
@@ -65,6 +66,13 @@ type PullRequestSummary = {
   createdAt: bigint;
   updatedAt: bigint;
   description: string;
+};
+
+type ForkCommitRecord = {
+  commitHash: Hex;
+  treeHash: Hex;
+  manifestDigest: Hex;
+  diffDigest: Hex;
 };
 
 type Manifest = {
@@ -137,6 +145,7 @@ function App() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
+  const [forkProgress, setForkProgress] = useState<{ copied: number; total: number } | null>(null);
   const [error, setError] = useState("");
   const [showCreatePr, setShowCreatePr] = useState(false);
   const [newPrTargetRepoId, setNewPrTargetRepoId] = useState("");
@@ -647,6 +656,169 @@ function App() {
     }
   }
 
+  async function forkRepository() {
+    if (!window.ethereum) {
+      setError("MetaMask가 필요합니다.");
+      return;
+    }
+    if (!walletAddress) {
+      setError("먼저 MetaMask를 연결하세요.");
+      return;
+    }
+    if (!selectedRepoId) {
+      setError("선택된 프로젝트가 없습니다.");
+      return;
+    }
+
+    const branch = selectedBranch || detailRepo?.metadata?.defaultBranch || "main";
+    if (!window.confirm(`'${branch}' 브랜치의 모든 커밋을 새 온체인 저장소로 복제합니다. 커밋 수만큼 MetaMask 트랜잭션 승인이 필요합니다. 계속할까요?`)) {
+      return;
+    }
+
+    let forkRepoId: bigint | null = null;
+    setLoadingAction("fork");
+    setForkProgress(null);
+    setError("");
+
+    try {
+      const chainId = (await window.ethereum.request({ method: "eth_chainId" })) as string;
+      if (Number.parseInt(chainId, 16) !== configuredChain.id) {
+        setError(`MetaMask network를 ${configuredChain.name}로 변경하세요.`);
+        return;
+      }
+
+      const address = parseAddress(contractAddress);
+      const branchHash = keccak256(stringToBytes(branch));
+      const historyLength = (await publicClient.readContract({
+        address,
+        abi,
+        functionName: "getBranchHistoryLength",
+        args: [selectedRepoId, branchHash],
+      })) as bigint;
+      if (historyLength === 0n) {
+        setError(`'${branch}' 브랜치에 복제할 커밋이 없습니다.`);
+        return;
+      }
+
+      const sourceMetadataCID = detailRepo?.metadataCID || bytesHexToString(
+        ((await publicClient.readContract({
+          address,
+          abi,
+          functionName: "getRepo",
+          args: [selectedRepoId],
+        })) as [Address, Hex])[1],
+      );
+      const sourceMetadata =
+        detailRepo?.metadata ?? (sourceMetadataCID ? await fetchJson<RepoMetadata>(ipfsURL(ipfsGateway, sourceMetadataCID)) : null);
+
+      const records: ForkCommitRecord[] = [];
+      const pageSize = 100n;
+      for (let start = 0n; start < historyLength; start += pageSize) {
+        const limit = historyLength - start > pageSize ? pageSize : historyLength - start;
+        const [commitHashes, treeHashes, manifestDigests, diffDigests] = (await publicClient.readContract({
+          address,
+          abi,
+          functionName: "getBranchCommitsWithMetadata",
+          args: [selectedRepoId, branchHash, start, limit],
+        })) as [Hex[], Hex[], Hex[], Hex[]];
+        for (let index = 0; index < commitHashes.length; index++) {
+          records.push({
+            commitHash: commitHashes[index],
+            treeHash: treeHashes[index],
+            manifestDigest: manifestDigests[index],
+            diffDigest: diffDigests[index],
+          });
+        }
+      }
+
+      const walletClient = createWalletClient({
+        account: walletAddress,
+        chain: configuredChain,
+        transport: custom(window.ethereum),
+      });
+      const createTxHash = await walletClient.writeContract({
+        address,
+        abi,
+        functionName: "createRepo",
+        args: [stringToHex(sourceMetadataCID)],
+      });
+      const createReceipt = await publicClient.waitForTransactionReceipt({ hash: createTxHash });
+      if (createReceipt.status !== "success") {
+        throw new Error("fork 저장소 생성 트랜잭션이 revert 되었습니다.");
+      }
+      forkRepoId = repoIdFromCreateReceipt(createReceipt.logs);
+
+      let expectedOldCommit = "0x0000000000000000000000000000000000000000" as Hex;
+      for (let index = 0; index < records.length; index++) {
+        const record = records[index];
+        setForkProgress({ copied: index, total: records.length });
+        const parentCount = (await publicClient.readContract({
+          address,
+          abi,
+          functionName: "getCommitParentCount",
+          args: [selectedRepoId, record.commitHash],
+        })) as bigint;
+        const parents: Hex[] = [];
+        for (let parentIndex = 0n; parentIndex < parentCount; parentIndex++) {
+          parents.push(
+            (await publicClient.readContract({
+              address,
+              abi,
+              functionName: "getCommitParentAt",
+              args: [selectedRepoId, record.commitHash, parentIndex],
+            })) as Hex,
+          );
+        }
+
+        const recordTxHash = await walletClient.writeContract({
+          address,
+          abi,
+          functionName: "recordCommit",
+          args: [
+            forkRepoId,
+            branchHash,
+            expectedOldCommit,
+            record.commitHash,
+            record.treeHash,
+            parents,
+            record.manifestDigest,
+            record.diffDigest,
+          ],
+        });
+        const recordReceipt = await publicClient.waitForTransactionReceipt({ hash: recordTxHash });
+        if (recordReceipt.status !== "success") {
+          throw new Error(`커밋 ${index + 1}/${records.length} 복제 트랜잭션이 revert 되었습니다.`);
+        }
+        expectedOldCommit = record.commitHash;
+        setForkProgress({ copied: index + 1, total: records.length });
+      }
+
+      const forkRepo: RepoSummary = {
+        id: forkRepoId,
+        owner: walletAddress,
+        metadataCID: sourceMetadataCID,
+        metadata: sourceMetadata,
+      };
+      const nextRepos = [...repos, forkRepo];
+      setRepos(nextRepos);
+      const nextPath = `/projects/${forkRepoId.toString()}?branch=${encodeURIComponent(branch)}`;
+      window.history.pushState({}, "", nextPath);
+      setPage("project");
+      setSelectedRepoId(forkRepoId);
+      setSelectedBranch(branch);
+      setSelectedPrId(null);
+      setActiveTab("commits");
+      autoLoadedRouteRef.current = `${contractAddress}:${forkRepoId.toString()}:${branch}`;
+      await loadRepoDetail(forkRepoId, nextRepos, branch);
+    } catch (err) {
+      const suffix = forkRepoId ? ` Fork repo #${forkRepoId.toString()} may be partially copied; do not retry without checking it first.` : "";
+      setError(`${errorMessage(err)}${suffix}`);
+    } finally {
+      setForkProgress(null);
+      setLoadingAction(null);
+    }
+  }
+
   function openPrDetail(pr: PullRequestSummary) {
     if (!selectedRepoId) return;
     const nextPath = `/projects/${selectedRepoId.toString()}/prs/${pr.id.toString()}?branch=${encodeURIComponent(selectedBranch)}`;
@@ -885,8 +1057,16 @@ function App() {
               <p>{detailRepo.metadata?.description || "Metadata and pull request state for the selected repository."}</p>
             </div>
             <div className="detailHeaderActions">
+              <button
+                type="button"
+                className="primaryButton copyButton"
+                onClick={() => void forkRepository()}
+                disabled={!walletAddress || loadingAction === "fork" || loadingDetail}
+              >
+                {forkProgress ? `Forking ${forkProgress.copied}/${forkProgress.total}` : `Fork ${selectedBranch || detailRepo.metadata?.defaultBranch || "main"}`}
+              </button>
               <button type="button" className="ghostButton copyButton" onClick={() => void copyForkCommand()} disabled={!detailRepo}>
-                {copyState === "copied" ? "Copied fork command" : "Copy fork command"}
+                {copyState === "copied" ? "Copied CLI fork command" : "Copy CLI fork command"}
               </button>
             </div>
           </header>
@@ -1414,6 +1594,21 @@ function buildForkCommand(options: {
     `--ipfs ${options.ipfsAPI}`,
     `--branch ${options.branch}`,
   ].join(" ");
+}
+
+function repoIdFromCreateReceipt(logs: readonly { data: Hex; topics: readonly Hex[] }[]): bigint {
+  for (const log of logs) {
+    try {
+      const decoded = decodeEventLog({ abi, data: log.data, topics: log.topics });
+      if (decoded.eventName === "RepoCreated") {
+        const repoId = (decoded.args as { repoId?: bigint }).repoId;
+        if (repoId !== undefined) return repoId;
+      }
+    } catch {
+      // The receipt can contain unrelated logs. Only RepoCreated is relevant here.
+    }
+  }
+  throw new Error("RepoCreated event was not found in the transaction receipt.");
 }
 
 function parseOptionalBigInt(value: string): bigint | null {

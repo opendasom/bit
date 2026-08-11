@@ -139,9 +139,12 @@ fork 완료 후 자동으로 설정됩니다:
 
 이후 새 커밋을 만들고 `bit push origin`으로 내 fork에 push할 수 있습니다.
 
-### 5-1. PR 생성 및 관리 (웹)
+### 5-1. Fork 및 PR 생성/관리 (웹)
 
-PR 생성/승인/거부/닫기는 웹 explorer에서 처리합니다 (GitHub 방식의 역할 분담: CLI는 push/pull/fork 같은 로컬 작업만 담당).
+웹 explorer에서 현재 브랜치를 새 온체인 저장소로 fork하거나 PR을 생성/승인/거부/닫을 수 있습니다.
+
+- **Fork `<branch>`** 버튼은 현재 브랜치의 온체인 커밋 히스토리와 IPFS CID 포인터를 새 저장소로 복제합니다. 커밋 수만큼 MetaMask 트랜잭션 승인이 필요합니다.
+- 웹 fork는 브라우저에 로컬 Git 워킹트리를 만들지 않습니다. 로컬 파일을 포함한 fork가 필요하면 기존 `bit fork` 명령을 사용합니다.
 
 1. fork 저장소에 새 커밋을 만들고 `bit push origin`으로 push합니다.
 2. 웹에서 **Connect MetaMask** 후 해당 저장소의 **Pull Requests** 탭을 엽니다.
