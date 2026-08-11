@@ -75,6 +75,13 @@ type ForkCommitRecord = {
   diffDigest: Hex;
 };
 
+type WorkflowStep = {
+  label: string;
+  fileName: string;
+  command: string;
+  output: string[];
+};
+
 type Manifest = {
   gitCommit: string;
   treeHash: string;
@@ -122,6 +129,32 @@ const LOG_BLOCK_RANGE = 50_000n;
 const ROLE_LABELS = ["None", "Contributor", "Maintainer", "Owner"] as const;
 type RoleLabel = (typeof ROLE_LABELS)[number];
 const PR_STATUS_LABELS = ["", "Open", "Approved", "Rejected", "Closed"] as const;
+const WORKFLOW_STEPS: WorkflowStep[] = [
+  {
+    label: "Initialize",
+    fileName: "01-init.sh",
+    command: "bit init --rpc $BIT_RPC_URL --contract $BIT_REGISTRY --key $PRIVATE_KEY",
+    output: ["uploading repository metadata to IPFS…", "repository created on-chain  ·  repoId: 1", "saved .bit/config.json"],
+  },
+  {
+    label: "Connect",
+    fileName: "02-remote.sh",
+    command: "bit remote add origin bit://sepolia/$BIT_REGISTRY/1",
+    output: ["origin registered", "network: sepolia", "branch: main"],
+  },
+  {
+    label: "Publish",
+    fileName: "03-push.sh",
+    command: "bit push origin",
+    output: ["packing commit diff…", "pinned manifest and diff to IPFS", "main → 72b24c6  ·  verified on-chain"],
+  },
+  {
+    label: "Collaborate",
+    fileName: "04-pull.sh",
+    command: "bit pull origin main",
+    output: ["resolving branch head from BitRegistry…", "restoring verified commits", "working tree is up to date"],
+  },
+];
 
 function App() {
   const initialRoute = routeFromLocation(window.location.pathname, window.location.search);
@@ -146,6 +179,9 @@ function App() {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
   const [forkProgress, setForkProgress] = useState<{ copied: number; total: number } | null>(null);
+  const [workflowVisible, setWorkflowVisible] = useState(false);
+  const [activeWorkflowStep, setActiveWorkflowStep] = useState(0);
+  const [typedWorkflowCommand, setTypedWorkflowCommand] = useState("");
   const [error, setError] = useState("");
   const [showCreatePr, setShowCreatePr] = useState(false);
   const [newPrTargetRepoId, setNewPrTargetRepoId] = useState("");
@@ -158,6 +194,7 @@ function App() {
   const publicClient = useMemo(() => createPublicClient({ transport: http(rpcURL) }), [rpcURL]);
   const selectedRepo = repos.find((repo) => repo.id === selectedRepoId) ?? null;
   const autoLoadedRouteRef = useRef<string | null>(null);
+  const workflowRef = useRef<HTMLElement | null>(null);
   const detailRepo =
     selectedRepo ?? (selectedRepoId ? { id: selectedRepoId, owner: "0x0000000000000000000000000000000000000000" as Address, metadataCID: "", metadata: null } : null);
   const repoNameById = useMemo(() => {
@@ -229,7 +266,40 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPrId, pullRequests]);
 
-  async function loadRepos() {
+  useEffect(() => {
+    const target = workflowRef.current;
+    if (!target || workflowVisible) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setWorkflowVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.28 },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [workflowVisible]);
+
+  useEffect(() => {
+    if (!workflowVisible) return;
+    const command = WORKFLOW_STEPS[activeWorkflowStep].command;
+    if (typedWorkflowCommand.length < command.length) {
+      const timer = window.setTimeout(() => {
+        setTypedWorkflowCommand(command.slice(0, typedWorkflowCommand.length + 1));
+      }, 22);
+      return () => window.clearTimeout(timer);
+    }
+
+    const timer = window.setTimeout(() => {
+      setActiveWorkflowStep((index) => (index + 1) % WORKFLOW_STEPS.length);
+      setTypedWorkflowCommand("");
+    }, 2400);
+    return () => window.clearTimeout(timer);
+  }, [activeWorkflowStep, typedWorkflowCommand, workflowVisible]);
+
+  async function loadRepos({ scrollToProjects = false }: { scrollToProjects?: boolean } = {}) {
     setLoadingRepos(true);
     setError("");
     try {
@@ -269,6 +339,11 @@ function App() {
       setBranches([]);
       setRepoRole("None");
       window.history.replaceState({}, "", "/");
+      if (scrollToProjects) {
+        window.requestAnimationFrame(() => {
+          document.getElementById("projects-band")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -941,6 +1016,7 @@ function App() {
 
   const walletSummary = walletAddress ? `${shortAddress(walletAddress)} · ${formatChainId(walletChainId)}` : "";
   const contractSummary = contractAddress ? shortAddress(contractAddress) : "n/a";
+  const workflowStep = WORKFLOW_STEPS[activeWorkflowStep];
 
   return (
     <main className="page">
@@ -986,28 +1062,158 @@ function App() {
         <>
           <section className="heroBand">
             <div className="heroCopy">
-              <div className="heroKicker">01. Landing Page</div>
-              <h1>BIT</h1>
-              <p>Repository history and pull request metadata, recorded on-chain and surfaced read-only in the browser.</p>
+              <div className="heroKicker">Open protocol for source history</div>
+              <h1>Git history,<br />verified.</h1>
+              <p>Bit records repository state on Ethereum and keeps commit data addressable through IPFS — without a central Git host.</p>
+              <div className="heroSignals" aria-label="Bit protocol components">
+                <span>Git-compatible</span>
+                <span>IPFS-backed</span>
+                <span>Ethereum-verified</span>
+              </div>
               <div className="heroActions">
-                <button type="button" className="primaryButton heroButton" onClick={loadRepos} disabled={loadingRepos}>
-                  {loadingRepos ? "Loading..." : "Load repositories"}
+                <button type="button" className="primaryButton heroButton" onClick={() => void loadRepos({ scrollToProjects: true })} disabled={loadingRepos}>
+                  {loadingRepos ? "Loading repositories..." : "Explore repositories"}
                 </button>
                 <button
                   type="button"
                   className="ghostButton heroButton"
-                  onClick={() => document.getElementById("projects-band")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  onClick={() => document.getElementById("workflow")?.scrollIntoView({ behavior: "smooth", block: "start" })}
                 >
-                  View projects
+                  Read the workflow
                 </button>
               </div>
             </div>
 
-            <div className="heroVisual" aria-hidden="true">
-              <div className="cube">
-                <span />
-                <span />
-                <span />
+            <div className="heroVisual" aria-label="Repository protocol preview">
+              <div className="repoPreview">
+                <div className="repoPreviewBar">
+                  <div className="windowDots" aria-hidden="true"><span /><span /><span /></div>
+                  <span className="mono">bit / protocol-overview.md</span>
+                  <span className="previewBranch"><i /> main</span>
+                </div>
+                <div className="repoPreviewBody">
+                  <div className="repoTree mono" aria-hidden="true">
+                    <span className="treeRoot">bit/</span>
+                    <span>├─ contracts/</span>
+                    <span>│  └─ BitRegistry.sol</span>
+                    <span>├─ internal/</span>
+                    <span>│  └─ ipfs/</span>
+                    <span>└─ web/</span>
+                  </div>
+                  <div className="repoCode mono">
+                    <span><b>01</b><em>## source, without a host</em></span>
+                    <span><b>02</b>commit.diff  <strong>→</strong>  <mark>IPFS</mark></span>
+                    <span><b>03</b>branch.head  <strong>→</strong>  <mark>Ethereum</mark></span>
+                    <span><b>04</b>pull request <strong>→</strong>  <mark>MetaMask</mark></span>
+                    <span><b>05</b></span>
+                    <span><b>06</b><em># every ref is independently verifiable</em></span>
+                  </div>
+                </div>
+                <div className="repoPreviewFooter">
+                  <span><i /> synced to registry</span>
+                  <span className="mono">commit 72b24c6</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="workflowBand" id="workflow" ref={workflowRef}>
+            <div className="workflowHeading">
+              <div>
+                <div className="eyebrow">Quick start</div>
+                <h2>Publish verifiable history in four commands.</h2>
+              </div>
+              <p>Initialize a repository, point it to BitRegistry, then publish and restore the same commit history from any machine.</p>
+            </div>
+
+            <div className="workflowShell">
+              <aside className="workflowSteps" aria-label="Bit command workflow">
+                {WORKFLOW_STEPS.map((step, index) => (
+                  <button
+                    key={step.label}
+                    type="button"
+                    className={index === activeWorkflowStep ? "workflowStep active" : "workflowStep"}
+                    onClick={() => {
+                      setWorkflowVisible(true);
+                      setActiveWorkflowStep(index);
+                      setTypedWorkflowCommand("");
+                    }}
+                  >
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <strong>{step.label}</strong>
+                  </button>
+                ))}
+              </aside>
+
+              <div className="commandStudio">
+                <div className="studioTabs">
+                  <div className="studioTab"><span className="fileDot" /> {workflowStep.fileName}</div>
+                  <div className="studioStatus"><i /> live example</div>
+                </div>
+                <div className="codeEditor mono">
+                  <div className="editorLine"><span>1</span><code># {workflowStep.label.toLowerCase()} a Bit repository</code></div>
+                  <div className="editorLine"><span>2</span><code>git status --short</code></div>
+                  <div className="editorLine active"><span>3</span><code><mark>$</mark> {typedWorkflowCommand}<i className="typingCursor" /></code></div>
+                  <div className="editorLine"><span>4</span><code className="comment"># provenance is stored, not hosted</code></div>
+                </div>
+                <div className="terminalOutput mono" aria-live="polite">
+                  <div className="terminalTitle"><span>terminal</span><span>zsh</span></div>
+                  {typedWorkflowCommand.length === workflowStep.command.length ? (
+                    workflowStep.output.map((line) => <div className="terminalLine" key={line}><i>›</i>{line}</div>)
+                  ) : (
+                    <div className="terminalLine muted"><i>›</i>waiting for command…</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="protocolBand">
+            <div className="protocolIntro">
+              <div className="eyebrow">Built for collaborative code</div>
+              <h2>Clear ownership. Portable history.</h2>
+              <p>Bit keeps the Git workflow familiar while moving repository state and review authority into a public, verifiable protocol.</p>
+            </div>
+
+            <div className="benefitGrid">
+              <article className="benefitCard">
+                <span className="benefitIndex">01</span>
+                <h3>History you can verify</h3>
+                <p>Branch heads and commit digests are recorded on-chain, so a client can independently validate the history it receives.</p>
+              </article>
+              <article className="benefitCard">
+                <span className="benefitIndex">02</span>
+                <h3>Data without a host</h3>
+                <p>Diffs and manifests are content-addressed on IPFS. A repository is not dependent on one central Git service.</p>
+              </article>
+              <article className="benefitCard">
+                <span className="benefitIndex">03</span>
+                <h3>Review at the protocol layer</h3>
+                <p>Pull request state and fast-forward approval live in BitRegistry, with MetaMask signing every write.</p>
+              </article>
+            </div>
+
+            <div className="rolesPanel">
+              <div className="rolesHeading">
+                <div className="eyebrow">Roles</div>
+                <h3>Who can do what?</h3>
+              </div>
+              <div className="roleGrid">
+                <article className="roleCard owner">
+                  <span>Owner</span>
+                  <strong>Govern access</strong>
+                  <p>Assign and revoke repository roles.</p>
+                </article>
+                <article className="roleCard maintainer">
+                  <span>Maintainer</span>
+                  <strong>Publish and merge</strong>
+                  <p>Record commits and approve or reject pull requests.</p>
+                </article>
+                <article className="roleCard contributor">
+                  <span>Contributor</span>
+                  <strong>Fork and propose</strong>
+                  <p>Fork public history, push to a fork, and open a pull request for review.</p>
+                </article>
               </div>
             </div>
           </section>
