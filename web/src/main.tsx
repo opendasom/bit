@@ -4,7 +4,6 @@ import {
   createPublicClient,
   createWalletClient,
   custom,
-  decodeEventLog,
   hexToString,
   http,
   keccak256,
@@ -15,145 +14,51 @@ import {
 } from "viem";
 import { foundry, sepolia } from "viem/chains";
 import bitRegistryArtifact from "../../internal/chain/artifacts/BitRegistry.json";
+import { PrDetailView } from "./components/PrDetailView";
+import { RepositoryList } from "./components/RepositoryList";
+import { APP_VERSION, LOG_BLOCK_RANGE, WORKFLOW_STEPS, type RoleLabel } from "./constants";
 import "./styles.css";
-
-type RepoMetadata = {
-  version?: number;
-  name?: string;
-  description?: string;
-  defaultBranch?: string;
-};
-
-type RepoSummary = {
-  id: bigint;
-  owner: Address;
-  metadataCID: string;
-  metadata: RepoMetadata | null;
-};
-
-type BranchSummary = {
-  name: string;
-  branchHash: Hex;
-  commitCount: number;
-  headCommit: string;
-};
-
-type CommitSummary = {
-  hash: string;
-  treeHash: string;
-  updater: Address;
-  chainTimestamp: bigint;
-  message: string;
-  authorName: string;
-  authorEmail: string;
-  authorDate: string;
-  committerName: string;
-  committerEmail: string;
-  committerDate: string;
-  parents: string[];
-};
-
-type PullRequestSummary = {
-  id: bigint;
-  targetRepoId: bigint;
-  targetBranch: Hex;
-  sourceRepoId: bigint;
-  sourceBranch: Hex;
-  baseCommit: Hex;
-  sourceHeadCommit: Hex;
-  author: Address;
-  status: bigint;
-  createdAt: bigint;
-  updatedAt: bigint;
-  description: string;
-};
-
-type ForkCommitRecord = {
-  commitHash: Hex;
-  treeHash: Hex;
-  manifestDigest: Hex;
-  diffDigest: Hex;
-};
-
-type WorkflowStep = {
-  label: string;
-  fileName: string;
-  command: string;
-  output: string[];
-};
-
-type Manifest = {
-  gitCommit: string;
-  treeHash: string;
-  branch?: string;
-  parentCommits?: string[];
-  author?: Identity;
-  committer?: Identity;
-  message?: string;
-};
-
-type Identity = {
-  name?: string;
-  email?: string;
-  date?: string;
-};
-
-type EthereumProvider = {
-  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-};
-
-type PullRequestCreatedLog = {
-  args: { prId?: bigint | null; sourceRepoId?: bigint | null };
-};
-
-type CommitRecordedLog = {
-  args: { commitHash?: Hex; manifestDigest?: Hex };
-};
-
-type PageState = "home" | "project";
-
-declare global {
-  interface Window {
-    ethereum?: EthereumProvider;
-  }
-}
+import type {
+  BranchSummary,
+  CommitRecordedLog,
+  CommitSummary,
+  ForkCommitRecord,
+  Manifest,
+  PageState,
+  PullRequestCreatedLog,
+  PullRequestSummary,
+  RepoMetadata,
+  RepoSummary,
+} from "./types";
+import {
+  bytes20HexToGitHash,
+  bytesHexToString,
+  cidV0FromDigest,
+  errorMessage,
+  fetchJson,
+  formatChainId,
+  formatDate,
+  formatUnix,
+  getManifest,
+  ipfsURL,
+  parseAddress,
+  parseOptionalBigInt,
+  prStatusChipClass,
+  prStatusLabel,
+  readStoredValue,
+  repoIdFromCreateReceipt,
+  roleToLabel,
+  routeFromLocation,
+  shortAddress,
+  shortHex,
+  writeStoredValue,
+} from "./utils";
 
 const abi = bitRegistryArtifact.abi;
 const configuredChain = Number(import.meta.env.VITE_BIT_CHAIN_ID ?? sepolia.id) === foundry.id ? foundry : sepolia;
 const defaultRpcURL = import.meta.env.VITE_BIT_RPC_URL ?? readStoredValue("bit.rpcURL") ?? "https://ethereum-sepolia-rpc.publicnode.com";
 const defaultContract = import.meta.env.VITE_BIT_CONTRACT ?? readStoredValue("bit.contract") ?? "0x34B9D83E03E2E7BF646E2452E0620E2F39cDbeE3";
 const defaultGateway = import.meta.env.VITE_BIT_IPFS_GATEWAY ?? readStoredValue("bit.ipfsGateway") ?? "https://ipfs.sugang.click/ipfs";
-const APP_VERSION = "1.1.0";
-const LOG_BLOCK_RANGE = 50_000n;
-const ROLE_LABELS = ["None", "Contributor", "Maintainer", "Owner"] as const;
-type RoleLabel = (typeof ROLE_LABELS)[number];
-const PR_STATUS_LABELS = ["", "Open", "Approved", "Rejected", "Closed"] as const;
-const WORKFLOW_STEPS: WorkflowStep[] = [
-  {
-    label: "Initialize",
-    fileName: "01-init.sh",
-    command: "bit init --rpc $BIT_RPC_URL --contract $BIT_REGISTRY --key $PRIVATE_KEY",
-    output: ["uploading repository metadata to IPFS…", "repository created on-chain  ·  repoId: 1", "saved .bit/config.json"],
-  },
-  {
-    label: "Connect",
-    fileName: "02-remote.sh",
-    command: "bit remote add origin bit://sepolia/$BIT_REGISTRY/1",
-    output: ["origin registered", "network: sepolia", "branch: main"],
-  },
-  {
-    label: "Publish",
-    fileName: "03-push.sh",
-    command: "bit push origin",
-    output: ["packing commit diff…", "pinned manifest and diff to IPFS", "main → 72b24c6  ·  verified on-chain"],
-  },
-  {
-    label: "Collaborate",
-    fileName: "04-pull.sh",
-    command: "bit pull origin main",
-    output: ["resolving branch head from BitRegistry…", "restoring verified commits", "working tree is up to date"],
-  },
-];
 
 function App() {
   const initialRoute = routeFromLocation(window.location.pathname, window.location.search);
@@ -192,6 +97,7 @@ function App() {
   const publicClient = useMemo(() => createPublicClient({ transport: http(rpcURL) }), [rpcURL]);
   const selectedRepo = repos.find((repo) => repo.id === selectedRepoId) ?? null;
   const autoLoadedRouteRef = useRef<string | null>(null);
+  const autoLoadedReposRef = useRef(false);
   const workflowRef = useRef<HTMLElement | null>(null);
   const detailRepo =
     selectedRepo ?? (selectedRepoId ? { id: selectedRepoId, owner: "0x0000000000000000000000000000000000000000" as Address, metadataCID: "", metadata: null } : null);
@@ -209,7 +115,6 @@ function App() {
     }
     return map;
   }, [branches]);
-
   useEffect(() => {
     const onPopState = () => {
       const nextRoute = routeFromLocation(window.location.pathname, window.location.search);
@@ -295,7 +200,15 @@ function App() {
     return () => window.clearTimeout(timer);
   }, [activeWorkflowStep, typedWorkflowCommand, workflowVisible]);
 
-  async function loadRepos({ scrollToProjects = false }: { scrollToProjects?: boolean } = {}) {
+  useEffect(() => {
+    if (page !== "home" || autoLoadedReposRef.current) return;
+    autoLoadedReposRef.current = true;
+    void loadRepos();
+    // Repository settings are deliberately refreshed through the Refresh button.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
+
+  async function loadRepos() {
     setLoadingRepos(true);
     setError("");
     try {
@@ -335,11 +248,6 @@ function App() {
       setBranches([]);
       setRepoRole("None");
       window.history.replaceState({}, "", "/");
-      if (scrollToProjects) {
-        window.requestAnimationFrame(() => {
-          document.getElementById("projects-band")?.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
-      }
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -1045,8 +953,12 @@ function App() {
                 <span>Ethereum-verified</span>
               </div>
               <div className="heroActions">
-                <button type="button" className="primaryButton heroButton" onClick={() => void loadRepos({ scrollToProjects: true })} disabled={loadingRepos}>
-                  {loadingRepos ? "Loading repositories..." : "Explore repositories"}
+                <button
+                  type="button"
+                  className="primaryButton heroButton"
+                  onClick={() => document.getElementById("projects-band")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                >
+                  Explore repositories
                 </button>
                 <button
                   type="button"
@@ -1194,39 +1106,7 @@ function App() {
             </div>
           </section>
 
-          <section className="projectsBand" id="projects-band">
-            <div className="bandHeading">
-              <div>
-                <div className="eyebrow">Projects</div>
-                <h2>Repository list</h2>
-                <p>Each entry is a repository registered in the current BitRegistry contract.</p>
-              </div>
-              <div className="panelBadge">{repos.length} repositories</div>
-            </div>
-
-            <div className="projectList">
-              {repos.length === 0 && <div className="emptyStage">Load repositories to see the list.</div>}
-              {repos.map((repo) => (
-                <button
-                  key={repo.id.toString()}
-                  type="button"
-                  className="projectRow"
-                  onClick={() => {
-                    void openRepo(repo.id);
-                  }}
-                >
-                  <div className="projectMain">
-                    <div className="projectTitle">{repo.metadata?.name || `Repo #${repo.id}`}</div>
-                    <div className="projectDescription">{repo.metadata?.description || "No description provided."}</div>
-                  </div>
-                  <div className="projectMeta">
-                    <span className="mono">{shortAddress(repo.owner)}</span>
-                    <span>{repo.metadata?.defaultBranch || "main"}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </section>
+          <RepositoryList repos={repos} loading={loadingRepos} onRefresh={() => void loadRepos()} onOpen={openRepo} />
         </>
       )}
 
@@ -1315,7 +1195,6 @@ function App() {
                             window.history.pushState({}, "", nextPath);
                             setSelectedBranch(branch.name);
                             setSelectedPrId(null);
-                            setCopyState("idle");
                             autoLoadedRouteRef.current = `${contractAddress}:${detailRepo.id.toString()}:${branch.name}`;
                             void loadRepoDetail(detailRepo.id, repos, branch.name);
                           }}
@@ -1605,330 +1484,6 @@ function App() {
       </footer>
     </main>
   );
-}
-
-function PrDetailView(props: {
-  pr: PullRequestSummary | null;
-  commits: CommitSummary[];
-  loading: boolean;
-  walletAddress: Address | null;
-  loadingAction: string | null;
-  branchLabel: (repoId: bigint, branchHash: Hex) => string;
-  canManage: (pr: PullRequestSummary) => boolean;
-  canClose: (pr: PullRequestSummary) => boolean;
-  onBack: () => void;
-  onAction: (pr: PullRequestSummary, action: "approvePullRequest" | "rejectPullRequest" | "closePullRequest") => void;
-}) {
-  const { pr, commits, loading, walletAddress, loadingAction, branchLabel, canManage, canClose, onBack, onAction } = props;
-  if (!pr) {
-    return (
-      <div className="panel panelTall">
-        <button type="button" className="ghostButton backButton" onClick={onBack}>
-          &larr; All pull requests
-        </button>
-        <div className="emptyState">Pull request not found.</div>
-      </div>
-    );
-  }
-
-  const titleLine = pr.description.split("\n")[0].trim() || "(no description)";
-
-  return (
-    <div className="panel panelTall">
-      <button type="button" className="ghostButton backButton" onClick={onBack}>
-        &larr; All pull requests
-      </button>
-
-      <div className="prDetailHeader">
-        <div>
-          <div className="prDetailTitleRow">
-            <span className={`statusChip ${prStatusChipClass(pr.status)}`}>{prStatusLabel(pr.status)}</span>
-            <h3 className="prDetailTitle">#{pr.id.toString()} · {titleLine}</h3>
-          </div>
-          <div className="prDetailAuthor">
-            <span className="mono">{shortAddress(pr.author)}</span>
-            <span>opened {formatUnix(pr.createdAt)}</span>
-            <span>updated {formatUnix(pr.updatedAt)}</span>
-          </div>
-        </div>
-        {pr.status === 1n && (
-          <div className="prActions">
-            {canManage(pr) && (
-              <button
-                type="button"
-                className="primaryButton"
-                disabled={!walletAddress || loadingAction === `approvePullRequest-${pr.id.toString()}`}
-                onClick={() => onAction(pr, "approvePullRequest")}
-              >
-                {loadingAction === `approvePullRequest-${pr.id.toString()}` ? "Approving..." : "Approve"}
-              </button>
-            )}
-            {canManage(pr) && (
-              <button
-                type="button"
-                className="dangerButton"
-                disabled={!walletAddress || loadingAction === `rejectPullRequest-${pr.id.toString()}`}
-                onClick={() => onAction(pr, "rejectPullRequest")}
-              >
-                {loadingAction === `rejectPullRequest-${pr.id.toString()}` ? "Rejecting..." : "Reject"}
-              </button>
-            )}
-            {canClose(pr) && (
-              <button
-                type="button"
-                className="ghostButton"
-                disabled={!walletAddress || loadingAction === `closePullRequest-${pr.id.toString()}`}
-                onClick={() => onAction(pr, "closePullRequest")}
-              >
-                {loadingAction === `closePullRequest-${pr.id.toString()}` ? "Closing..." : "Close"}
-              </button>
-            )}
-            {!walletAddress && <span className="helperText">Connect MetaMask to sign.</span>}
-          </div>
-        )}
-      </div>
-
-      {pr.description && <div className="prDetailDescription">{pr.description}</div>}
-
-      <div className="prMetaGrid prDetailMetaGrid">
-        <div>
-          <span>Source repo</span>
-          <strong>{branchLabel(pr.sourceRepoId, pr.sourceBranch)}</strong>
-        </div>
-        <div>
-          <span>Target repo</span>
-          <strong>{branchLabel(pr.targetRepoId, pr.targetBranch)}</strong>
-        </div>
-        <div>
-          <span>Base</span>
-          <strong className="mono">{shortHex(pr.baseCommit)}</strong>
-        </div>
-        <div>
-          <span>Head</span>
-          <strong className="mono">{shortHex(pr.sourceHeadCommit)}</strong>
-        </div>
-      </div>
-
-      <div className="panelHeading prDetailCommitsHeading">
-        <div>
-          <span className="eyebrow">Commits</span>
-          <h3>Included changes</h3>
-        </div>
-        <div className="panelBadge">{commits.length} commits</div>
-      </div>
-      <div className="timeline">
-        {loading && commits.length === 0 && <div className="emptyState">Loading commits...</div>}
-        {!loading && commits.length === 0 && <div className="emptyState">No new commits in this pull request.</div>}
-        {commits.map((commit) => (
-          <article className="timelineItem" key={commit.hash}>
-            <div className="timelineMark" />
-            <div className="timelineBody">
-              <div className="timelineTop">
-                <h4>{commit.message || "(no message)"}</h4>
-                <span className="mono commitHash">{shortHex(commit.hash)}</span>
-              </div>
-              <div className="timelineMeta">
-                <span>{commit.authorName || "Unknown author"}</span>
-                <span>{formatDate(commit.authorDate)}</span>
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function routeFromLocation(
-  pathname: string,
-  search: string,
-): { page: PageState; repoId: bigint | null; branch: string | null; prId: bigint | null } {
-  const prMatch = pathname.match(/^\/projects\/(\d+)\/prs\/(\d+)\/?$/);
-  if (prMatch) {
-    const params = new URLSearchParams(search);
-    return { page: "project", repoId: BigInt(prMatch[1]), branch: params.get("branch"), prId: BigInt(prMatch[2]) };
-  }
-  const match = pathname.match(/^\/projects\/(\d+)\/?$/);
-  if (!match) {
-    return { page: "home", repoId: null, branch: null, prId: null };
-  }
-  const params = new URLSearchParams(search);
-  return { page: "project", repoId: BigInt(match[1]), branch: params.get("branch"), prId: null };
-}
-
-function repoIdFromCreateReceipt(logs: readonly { data: Hex; topics: readonly Hex[] }[]): bigint {
-  for (const log of logs) {
-    try {
-      const decoded = decodeEventLog({ abi, data: log.data, topics: log.topics });
-      if (decoded.eventName === "RepoCreated") {
-        const repoId = (decoded.args as { repoId?: bigint }).repoId;
-        if (repoId !== undefined) return repoId;
-      }
-    } catch {
-      // The receipt can contain unrelated logs. Only RepoCreated is relevant here.
-    }
-  }
-  throw new Error("RepoCreated event was not found in the transaction receipt.");
-}
-
-function parseOptionalBigInt(value: string): bigint | null {
-  if (!/^\d+$/.test(value.trim())) return null;
-  try {
-    return BigInt(value.trim());
-  } catch {
-    return null;
-  }
-}
-
-function prStatusLabel(status: bigint): string {
-  const label = PR_STATUS_LABELS[Number(status)];
-  return label || "Unknown";
-}
-
-function prStatusChipClass(status: bigint): string {
-  switch (Number(status)) {
-    case 1:
-      return "open";
-    case 2:
-      return "approved";
-    case 3:
-      return "rejected";
-    case 4:
-      return "closed";
-    default:
-      return "";
-  }
-}
-
-function parseAddress(value: string): Address {
-  const normalized = value.trim();
-  if (!/^0x[a-fA-F0-9]{40}$/.test(normalized)) {
-    throw new Error("Contract address must be a 20-byte hex address.");
-  }
-  return normalized as Address;
-}
-
-function bytesHexToString(value: Hex): string {
-  const hex = value.startsWith("0x") ? value.slice(2) : value;
-  let out = "";
-  for (let index = 0; index < hex.length; index += 2) {
-    const code = Number.parseInt(hex.slice(index, index + 2), 16);
-    if (code !== 0) out += String.fromCharCode(code);
-  }
-  return out;
-}
-
-function bytes20HexToGitHash(value: Hex): string {
-  return value.startsWith("0x") ? value.slice(2) : value;
-}
-
-function ipfsURL(gateway: string, cid: string): string {
-  return `${gateway.replace(/\/$/, "")}/${cid}`;
-}
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`IPFS fetch failed (${response.status})`);
-  }
-  return response.json() as Promise<T>;
-}
-
-const manifestCache = new Map<string, Manifest>();
-
-async function getManifest(gateway: string, cid: string): Promise<Manifest> {
-  const cacheKey = `${gateway}|${cid}`;
-  const cached = manifestCache.get(cacheKey);
-  if (cached) return cached;
-  const manifest = await fetchJson<Manifest>(ipfsURL(gateway, cid));
-  manifestCache.set(cacheKey, manifest);
-  return manifest;
-}
-
-function cidV0FromDigest(digestHex: Hex): string {
-  const digest = hexToBytes(digestHex);
-  return base58btcEncode(new Uint8Array([0x12, 0x20, ...digest]));
-}
-
-function hexToBytes(value: Hex): Uint8Array {
-  const hex = value.startsWith("0x") ? value.slice(2) : value;
-  const out = new Uint8Array(hex.length / 2);
-  for (let index = 0; index < out.length; index += 1) {
-    out[index] = Number.parseInt(hex.slice(index * 2, index * 2 + 2), 16);
-  }
-  return out;
-}
-
-function base58btcEncode(bytes: Uint8Array): string {
-  const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-  let value = 0n;
-  for (const byte of bytes) {
-    value = (value << 8n) + BigInt(byte);
-  }
-  let encoded = "";
-  while (value > 0n) {
-    const mod = value % 58n;
-    encoded = alphabet[Number(mod)] + encoded;
-    value /= 58n;
-  }
-  for (const byte of bytes) {
-    if (byte !== 0) break;
-    encoded = alphabet[0] + encoded;
-  }
-  return encoded;
-}
-
-function formatDate(value: string): string {
-  if (!value) return "unknown";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
-}
-
-function formatUnix(value: bigint): string {
-  return new Date(Number(value) * 1000).toLocaleString();
-}
-
-function formatChainId(chainId: string): string {
-  if (!chainId) return "";
-  try {
-    return String(Number.parseInt(chainId, 16));
-  } catch {
-    return chainId;
-  }
-}
-
-function shortAddress(value: string): string {
-  if (!value) return "n/a";
-  return `${value.slice(0, 6)}...${value.slice(-4)}`;
-}
-
-function shortHex(value: string): string {
-  return `${value.slice(0, 8)}...${value.slice(-6)}`;
-}
-
-function roleToLabel(value: bigint): RoleLabel {
-  const index = Number(value);
-  return ROLE_LABELS[index] ?? "None";
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
-function readStoredValue(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredValue(key: string, value: string) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // Ignore storage failures in private mode or restricted environments.
-  }
 }
 
 createRoot(document.getElementById("root")!).render(
