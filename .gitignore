@@ -6,7 +6,7 @@ kubo/
 kubo_v0.27.0_linux-amd64.tar.gz
 
 # 테스트 임시 파일/디렉토리
-test/
+#test/
 local-test-repo/
 *_test_main.go
 
