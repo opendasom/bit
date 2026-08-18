@@ -1540,6 +1540,146 @@ input:focus {
   min-height: 44px;
 }
 
+.forkPage {
+  width: min(100%, calc(960px + (var(--page-gutter) * 2)));
+  margin-inline: auto;
+  padding: 46px var(--page-gutter) 72px;
+}
+
+.forkPageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.forkPageHeader h2 {
+  margin: 0;
+  font-size: clamp(28px, 4vw, 42px);
+  letter-spacing: -0.04em;
+}
+
+.forkPageHeader p {
+  max-width: 62ch;
+  margin: 10px 0 0;
+  color: rgba(239, 243, 239, 0.62);
+  line-height: 1.55;
+}
+
+.forkSetup {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
+  gap: 16px;
+}
+
+.forkFormPanel,
+.forkReviewPanel {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
+  padding: 22px;
+}
+
+.forkNameField > span {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(239, 243, 239, 0.52);
+}
+
+.forkNameField input {
+  min-height: 50px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.forkFormPanel > .helperText {
+  margin: 9px 0 24px;
+  line-height: 1.5;
+}
+
+.forkSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.forkSummaryGrid > div {
+  display: grid;
+  gap: 7px;
+  min-height: 78px;
+  padding: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.forkSummaryGrid span,
+.forkTransactionNote span {
+  color: rgba(239, 243, 239, 0.43);
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.forkSummaryGrid strong {
+  align-self: end;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.forkReviewPanel {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 28px;
+  border-color: rgba(124, 211, 156, 0.2);
+  background: rgba(124, 211, 156, 0.035);
+}
+
+.forkReviewPanel h3 {
+  margin: 0;
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+
+.forkReviewPanel p {
+  margin: 10px 0 0;
+  color: rgba(239, 243, 239, 0.58);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.forkTransactionNote {
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  border: 1px solid rgba(124, 211, 156, 0.15);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.forkTransactionNote strong {
+  color: #a7eab9;
+  font-size: 26px;
+}
+
+.forkTransactionNote small {
+  color: rgba(239, 243, 239, 0.5);
+  line-height: 1.45;
+}
+
+.forkFormActions {
+  display: grid;
+  grid-template-columns: 0.7fr 1.3fr;
+  gap: 10px;
+}
+
+.forkFormActions button {
+  min-height: 44px;
+}
+
 .detailShell {
   display: grid;
   grid-template-columns: 170px minmax(0, 1fr);
@@ -1592,7 +1732,8 @@ input:focus {
 
   .workflowHeading,
   .protocolIntro,
-  .rolesPanel {
+  .rolesPanel,
+  .forkSetup {
     grid-template-columns: 1fr;
   }
 
@@ -1603,6 +1744,15 @@ input:focus {
 }
 
 @media (max-width: 760px) {
+  .forkPageHeader {
+    display: grid;
+  }
+
+  .forkSummaryGrid,
+  .forkFormActions {
+    grid-template-columns: 1fr;
+  }
+
   .heroBand {
     min-height: auto;
     padding-top: 40px;

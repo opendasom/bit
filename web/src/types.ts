@@ -85,7 +85,7 @@ export type EthereumProvider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 };
 
-export type PageState = "home" | "project";
+export type PageState = "home" | "project" | "fork";
 
 declare global {
   interface Window {

@@ -14,6 +14,7 @@ import {
 } from "viem";
 import { foundry, sepolia } from "viem/chains";
 import bitRegistryArtifact from "../../internal/chain/artifacts/BitRegistry.json";
+import { ForkRepositoryPage } from "./components/ForkRepositoryPage";
 import { PrDetailView } from "./components/PrDetailView";
 import { RepositoryList } from "./components/RepositoryList";
 import { APP_VERSION, WORKFLOW_STEPS, type RoleLabel } from "./constants";
@@ -49,10 +50,12 @@ import {
   routeFromLocation,
   shortAddress,
   shortHex,
+  uploadJsonToIPFS,
   writeStoredValue,
 } from "./utils";
 
 const abi = bitRegistryArtifact.abi;
+const defaultIpfsAPI = import.meta.env.VITE_BIT_IPFS_API ?? "/ipfs-api";
 const configuredChain = Number(import.meta.env.VITE_BIT_CHAIN_ID ?? sepolia.id) === foundry.id ? foundry : sepolia;
 const defaultRpcURL = import.meta.env.VITE_BIT_RPC_URL ?? readStoredValue("bit.rpcURL") ?? "https://ethereum-sepolia-rpc.publicnode.com";
 const defaultContract = import.meta.env.VITE_BIT_CONTRACT ?? readStoredValue("bit.contract") ?? "0x34B9D83E03E2E7BF646E2452E0620E2F39cDbeE3";
@@ -659,7 +662,26 @@ function App() {
     }
   }
 
-  async function forkRepository() {
+  function openForkPage() {
+    if (!selectedRepoId) return;
+    const branch = selectedBranch || detailRepo?.metadata?.defaultBranch || "main";
+    const nextPath = `/projects/${selectedRepoId.toString()}/fork?branch=${encodeURIComponent(branch)}`;
+    window.history.pushState({}, "", nextPath);
+    setPage("fork");
+    setSelectedPrId(null);
+    setError("");
+  }
+
+  function closeForkPage() {
+    if (!selectedRepoId) return;
+    const branch = selectedBranch || detailRepo?.metadata?.defaultBranch || "main";
+    const nextPath = `/projects/${selectedRepoId.toString()}?branch=${encodeURIComponent(branch)}`;
+    window.history.pushState({}, "", nextPath);
+    setPage("project");
+    setError("");
+  }
+
+  async function forkRepository(forkName: string) {
     if (!window.ethereum) {
       setError("MetaMask가 필요합니다.");
       return;
@@ -674,7 +696,9 @@ function App() {
     }
 
     const branch = selectedBranch || detailRepo?.metadata?.defaultBranch || "main";
-    if (!window.confirm(`'${branch}' 브랜치의 모든 커밋을 새 온체인 저장소로 복제합니다. 커밋 수만큼 MetaMask 트랜잭션 승인이 필요합니다. 계속할까요?`)) {
+    const name = forkName.trim();
+    if (!name) {
+      setError("Fork repository name is required.");
       return;
     }
 
@@ -713,6 +737,13 @@ function App() {
       );
       const sourceMetadata =
         detailRepo?.metadata ?? (sourceMetadataCID ? await fetchJson<RepoMetadata>(ipfsURL(ipfsGateway, sourceMetadataCID)) : null);
+      const forkMetadata: RepoMetadata = {
+        version: sourceMetadata?.version ?? 1,
+        name,
+        description: sourceMetadata?.description,
+        defaultBranch: branch,
+      };
+      const forkMetadataCID = await uploadJsonToIPFS(defaultIpfsAPI, forkMetadata);
 
       const records: ForkCommitRecord[] = [];
       const pageSize = 100n;
@@ -743,7 +774,7 @@ function App() {
         address,
         abi,
         functionName: "createRepo",
-        args: [stringToHex(sourceMetadataCID)],
+        args: [stringToHex(forkMetadataCID)],
       });
       const createReceipt = await publicClient.waitForTransactionReceipt({ hash: createTxHash });
       if (createReceipt.status !== "success") {
@@ -799,8 +830,8 @@ function App() {
       const forkRepo: RepoSummary = {
         id: forkRepoId,
         owner: walletAddress,
-        metadataCID: sourceMetadataCID,
-        metadata: sourceMetadata,
+        metadataCID: forkMetadataCID,
+        metadata: forkMetadata,
       };
       const nextRepos = [...repos, forkRepo];
       setRepos(nextRepos);
@@ -1136,6 +1167,22 @@ function App() {
         </>
       )}
 
+      {page === "fork" && detailRepo && (
+        <ForkRepositoryPage
+          sourceRepo={detailRepo}
+          branch={selectedBranch || detailRepo.metadata?.defaultBranch || "main"}
+          commitCount={
+            branches.find((branch) => branch.name === (selectedBranch || detailRepo.metadata?.defaultBranch || "main"))
+              ?.commitCount ?? null
+          }
+          loading={loadingAction === "fork"}
+          progress={forkProgress}
+          walletAddress={walletAddress ?? ""}
+          onCancel={closeForkPage}
+          onSubmit={(name) => void forkRepository(name)}
+        />
+      )}
+
       {page === "project" && detailRepo && (
         <section className="detailBand" id="detail-band">
           <header className="detailHeader">
@@ -1149,10 +1196,10 @@ function App() {
               <button
                 type="button"
                 className="primaryButton forkButton"
-                onClick={() => void forkRepository()}
+                onClick={openForkPage}
                 disabled={!walletAddress || loadingAction === "fork" || loadingDetail}
               >
-                {forkProgress ? `Forking ${forkProgress.copied}/${forkProgress.total}` : `Fork ${selectedBranch || detailRepo.metadata?.defaultBranch || "main"}`}
+                Fork {selectedBranch || detailRepo.metadata?.defaultBranch || "main"}
               </button>
           </div>
 
