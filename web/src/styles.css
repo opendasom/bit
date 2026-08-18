@@ -4,10 +4,14 @@
   color: #eff3ef;
   background:
     radial-gradient(circle at top left, rgba(124, 211, 156, 0.12), transparent 24%),
-    radial-gradient(circle at 20% 70%, rgba(99, 179, 120, 0.08), transparent 20%),
-    linear-gradient(180deg, #050607 0%, #090a0b 45%, #050607 100%);
+    radial-gradient(circle at 20% 70%, rgba(99, 179, 120, 0.08), transparent 20%), linear-gradient(180deg, #050607 0%, #090a0b 45%, #050607 100%);
   font-family:
-    "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    "IBM Plex Sans",
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   color-scheme: dark;
@@ -25,11 +29,11 @@ body,
 }
 
 body {
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    #050607;
-  background-size: 56px 56px, 56px 56px, auto;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px), linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), #050607;
+  background-size:
+    56px 56px,
+    56px 56px,
+    auto;
 }
 
 button,
@@ -116,6 +120,52 @@ button {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.connectionSettings {
+  position: relative;
+}
+
+.connectionSettings > summary {
+  display: flex;
+  align-items: center;
+  list-style: none;
+}
+
+.connectionSettings > summary::-webkit-details-marker {
+  display: none;
+}
+
+.connectionSettings[open] > summary {
+  border-color: rgba(124, 211, 156, 0.35);
+  color: #a7eab9;
+}
+
+.connectionPopover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 80;
+  display: grid;
+  gap: 12px;
+  width: min(440px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid rgba(124, 211, 156, 0.2);
+  border-radius: 12px;
+  background: rgba(9, 10, 11, 0.98);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+}
+
+.connectionHeading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.connectionHeading span {
+  color: rgba(239, 243, 239, 0.52);
+  font-size: 12px;
 }
 
 .headerField {
@@ -294,8 +344,7 @@ button:disabled {
   inset: 10% 8%;
   border-radius: 32px;
   border: 1px solid rgba(255, 255, 255, 0.07);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
   box-shadow: inset 0 0 120px rgba(124, 211, 156, 0.05);
 }
 
@@ -343,9 +392,15 @@ button:disabled {
   background: rgba(239, 243, 239, 0.3);
 }
 
-.windowDots span:nth-child(1) { background: #d97768; }
-.windowDots span:nth-child(2) { background: #d8b56b; }
-.windowDots span:nth-child(3) { background: #75bf8a; }
+.windowDots span:nth-child(1) {
+  background: #d97768;
+}
+.windowDots span:nth-child(2) {
+  background: #d8b56b;
+}
+.windowDots span:nth-child(3) {
+  background: #75bf8a;
+}
 
 .previewBranch,
 .studioStatus {
@@ -388,7 +443,9 @@ button:disabled {
   color: rgba(239, 243, 239, 0.46);
 }
 
-.repoTree .treeRoot { color: #b8ecc6; }
+.repoTree .treeRoot {
+  color: #b8ecc6;
+}
 
 .repoCode {
   color: rgba(239, 243, 239, 0.75);
@@ -411,7 +468,9 @@ button:disabled {
   font-style: normal;
 }
 
-.repoCode strong { color: rgba(239, 243, 239, 0.34); }
+.repoCode strong {
+  color: rgba(239, 243, 239, 0.34);
+}
 
 .repoCode mark,
 .codeEditor mark {
@@ -444,9 +503,7 @@ button:disabled {
   overflow: hidden;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background:
-    radial-gradient(circle at 92% 8%, rgba(124, 211, 156, 0.1), transparent 26%),
-    rgba(255, 255, 255, 0.012);
+  background: radial-gradient(circle at 92% 8%, rgba(124, 211, 156, 0.1), transparent 26%), rgba(255, 255, 255, 0.012);
 }
 
 .workflowBand::before {
@@ -544,7 +601,9 @@ button:disabled {
   color: #ddffe6;
 }
 
-.workflowStep.active span { color: #84d69b; }
+.workflowStep.active span {
+  color: #84d69b;
+}
 
 .commandStudio {
   display: grid;
@@ -593,8 +652,13 @@ button:disabled {
   line-height: 1.6;
 }
 
-.editorLine > span { color: rgba(239, 243, 239, 0.2); text-align: right; }
-.editorLine code { overflow-wrap: anywhere; }
+.editorLine > span {
+  color: rgba(239, 243, 239, 0.2);
+  text-align: right;
+}
+.editorLine code {
+  overflow-wrap: anywhere;
+}
 
 .editorLine.active {
   margin-inline: -10px;
@@ -615,7 +679,9 @@ button:disabled {
 }
 
 @keyframes blink {
-  50% { opacity: 0; }
+  50% {
+    opacity: 0;
+  }
 }
 
 .terminalOutput {
@@ -636,9 +702,17 @@ button:disabled {
   letter-spacing: 0.08em;
 }
 
-.terminalLine { display: flex; gap: 8px; }
-.terminalLine i { color: #8adca1; font-style: normal; }
-.terminalLine.muted { color: rgba(239, 243, 239, 0.32); }
+.terminalLine {
+  display: flex;
+  gap: 8px;
+}
+.terminalLine i {
+  color: #8adca1;
+  font-style: normal;
+}
+.terminalLine.muted {
+  color: rgba(239, 243, 239, 0.32);
+}
 
 .protocolBand {
   display: grid;
@@ -697,7 +771,11 @@ button:disabled {
   background: rgba(124, 211, 156, 0.035);
 }
 
-.rolesHeading h3 { margin: 0; font-size: 22px; letter-spacing: -0.03em; }
+.rolesHeading h3 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
 
 .roleGrid {
   display: grid;
@@ -722,10 +800,20 @@ button:disabled {
   text-transform: uppercase;
 }
 
-.roleCard strong { display: block; margin-bottom: 7px; font-size: 14px; }
-.roleCard.owner { border-color: #dac478; }
-.roleCard.maintainer { border-color: #7cd39c; }
-.roleCard.contributor { border-color: #84b9f4; }
+.roleCard strong {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 14px;
+}
+.roleCard.owner {
+  border-color: #dac478;
+}
+.roleCard.maintainer {
+  border-color: #7cd39c;
+}
+.roleCard.contributor {
+  border-color: #84b9f4;
+}
 
 .cube {
   position: relative;
@@ -992,12 +1080,30 @@ input:focus {
 }
 
 .errorBanner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
   margin: 0 24px 14px;
   padding: 13px 14px;
   border-left: 3px solid #de7b6a;
   border-radius: 8px;
   background: rgba(222, 123, 106, 0.08);
   color: #ffd8d2;
+}
+
+.errorBanner button {
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.branchItem:disabled {
+  cursor: not-allowed;
 }
 
 .projectsBand,
@@ -1680,6 +1786,22 @@ input:focus {
   min-height: 44px;
 }
 
+.roleManager {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.roleManager h3 {
+  margin: 4px 0 0;
+}
+
+.roleManager .helperText {
+  margin: 0;
+}
+
 .detailShell {
   display: grid;
   grid-template-columns: 170px minmax(0, 1fr);
@@ -1721,6 +1843,11 @@ input:focus {
     justify-content: flex-start;
   }
 
+  .connectionPopover {
+    right: auto;
+    left: 0;
+  }
+
   .headerField {
     min-width: 0;
     width: 100%;
@@ -1740,6 +1867,17 @@ input:focus {
   .workflowHeading h2,
   .protocolIntro h2 {
     max-width: 18ch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
@@ -1797,7 +1935,9 @@ input:focus {
     min-height: 36px;
   }
 
-  .workflowStep span { display: none; }
+  .workflowStep span {
+    display: none;
+  }
 
   .studioTabs,
   .codeEditor,
@@ -1805,14 +1945,18 @@ input:focus {
     padding-inline: 12px;
   }
 
-  .studioStatus { display: none; }
+  .studioStatus {
+    display: none;
+  }
 
   .benefitGrid,
   .roleGrid {
     grid-template-columns: 1fr;
   }
 
-  .benefitCard { min-height: 0; }
+  .benefitCard {
+    min-height: 0;
+  }
 
   .connectGrid,
   .connectMeta,

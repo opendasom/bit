@@ -2,6 +2,7 @@ import type { WorkflowStep } from "./types";
 
 export const APP_VERSION = "1.1.0";
 export const REPOSITORIES_PER_PAGE = 6;
+export const MAX_REPOSITORY_NAME_LENGTH = 100;
 export const ROLE_LABELS = ["None", "Contributor", "Maintainer", "Owner"] as const;
 export type RoleLabel = (typeof ROLE_LABELS)[number];
 export const PR_STATUS_LABELS = ["", "Open", "Approved", "Rejected", "Closed"] as const;
@@ -10,7 +11,7 @@ export const WORKFLOW_STEPS: WorkflowStep[] = [
   {
     label: "Initialize",
     fileName: "01-init.sh",
-    command: "bit init --rpc $BIT_RPC_URL --contract $BIT_REGISTRY --key $PRIVATE_KEY",
+    command: "BIT_PRIVATE_KEY=$BIT_PRIVATE_KEY bit init --rpc $BIT_RPC_URL --contract $BIT_REGISTRY",
     output: ["uploading repository metadata to IPFS…", "repository created on-chain  ·  repoId: 1", "saved .bit/config.json"],
   },
   {

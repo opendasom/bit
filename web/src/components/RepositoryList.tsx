@@ -54,7 +54,9 @@ export function RepositoryList({ repos, loading, onRefresh, onOpen }: Repository
             <button key={repo.id.toString()} type="button" className="projectRow" onClick={() => onOpen(repo.id)}>
               <div className="projectMain">
                 <div className="projectTitle">{repo.metadata?.name || `Repo #${repo.id}`}</div>
-                <div className="projectDescription">{repo.metadata?.description || "No description provided."}</div>
+                <div className="projectDescription">
+                  {repo.metadataError ? "Metadata is temporarily unavailable." : repo.metadata?.description || "No description provided."}
+                </div>
               </div>
               <div className="projectMeta">
                 <span className="mono">{shortAddress(repo.owner)}</span>
@@ -86,7 +88,9 @@ export function RepositoryList({ repos, loading, onRefresh, onOpen }: Repository
                   {item}
                 </button>
               ) : (
-                <span key={item} className="paginationEllipsis" aria-hidden="true">…</span>
+                <span key={item} className="paginationEllipsis" aria-hidden="true">
+                  …
+                </span>
               ),
             )}
             <button

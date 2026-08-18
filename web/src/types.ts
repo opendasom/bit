@@ -12,6 +12,7 @@ export type RepoSummary = {
   owner: Address;
   metadataCID: string;
   metadata: RepoMetadata | null;
+  metadataError?: string;
 };
 
 export type BranchSummary = {
@@ -19,6 +20,7 @@ export type BranchSummary = {
   branchHash: Hex;
   commitCount: number;
   headCommit: string;
+  resolvedName: boolean;
 };
 
 export type CommitSummary = {
@@ -34,6 +36,7 @@ export type CommitSummary = {
   committerEmail: string;
   committerDate: string;
   parents: string[];
+  metadataError?: string;
 };
 
 export type PullRequestSummary = {
@@ -49,13 +52,8 @@ export type PullRequestSummary = {
   createdAt: bigint;
   updatedAt: bigint;
   description: string;
-};
-
-export type ForkCommitRecord = {
-  commitHash: Hex;
-  treeHash: Hex;
-  manifestDigest: Hex;
-  diffDigest: Hex;
+  sourceStart: bigint;
+  sourceEnd: bigint;
 };
 
 export type WorkflowStep = {
@@ -66,23 +64,30 @@ export type WorkflowStep = {
 };
 
 export type Manifest = {
+  version: number;
+  storage: string;
+  diffAlgorithm: string;
   gitCommit: string;
   treeHash: string;
-  branch?: string;
-  parentCommits?: string[];
-  author?: Identity;
-  committer?: Identity;
-  message?: string;
+  branch: string;
+  diffCID: string;
+  parentCommits: string[];
+  author: Identity;
+  committer: Identity;
+  message: string;
+  bundleCid?: string;
 };
 
 export type Identity = {
-  name?: string;
-  email?: string;
-  date?: string;
+  name: string;
+  email: string;
+  date: string;
 };
 
 export type EthereumProvider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+  on?: (event: "accountsChanged" | "chainChanged", listener: (...args: unknown[]) => void) => void;
+  removeListener?: (event: "accountsChanged" | "chainChanged", listener: (...args: unknown[]) => void) => void;
 };
 
 export type PageState = "home" | "project" | "fork";
