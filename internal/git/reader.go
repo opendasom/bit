@@ -32,6 +32,11 @@ type CommitInfo struct {
 	Message        string
 }
 
+func InitRepository(repoPath string) error {
+	_, err := runGit(repoPath, "init")
+	return err
+}
+
 func runGit(repoPath string, args ...string) ([]byte, error) {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = repoPath
@@ -57,6 +62,10 @@ func runGitInput(repoPath string, input []byte, args ...string) ([]byte, error) 
 		return nil, fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
 	}
 	return out.Bytes(), nil
+}
+
+func runGitEnv(repoPath string, env []string, args ...string) ([]byte, error) {
+	return runGitEnvInput(repoPath, env, nil, args...)
 }
 
 func runGitEnvInput(repoPath string, env []string, input []byte, args ...string) ([]byte, error) {
@@ -249,68 +258,109 @@ func ApplyCommitDiff(repoPath string, m *manifest.Manifest, diff []byte) error {
 	if err := ensureCleanWorktree(repoPath); err != nil {
 		return err
 	}
-	if m.Version != manifest.VersionCommitDiff || m.Storage != manifest.StorageGitDiff {
-		return fmt.Errorf("unsupported manifest storage: version=%d storage=%s", m.Version, m.Storage)
+	newHash, err := BuildCommitDiff(repoPath, m, diff)
+	if err != nil {
+		return err
+	}
+	return CheckoutBranch(repoPath, m.Branch, newHash)
+}
+
+// BuildCommitDiff verifies and constructs a commit with an isolated temporary
+// index. It writes Git objects but does not change refs, the index, or the worktree.
+func BuildCommitDiff(repoPath string, m *manifest.Manifest, diff []byte) (string, error) {
+	if m.Version != manifest.VersionCommitDiff || m.Storage != manifest.StorageGitDiff || m.DiffAlgorithm != manifest.DiffBinaryPatch {
+		return "", fmt.Errorf("unsupported manifest storage: version=%d storage=%s", m.Version, m.Storage)
 	}
 	if m.Branch == "" {
-		return errors.New("manifest branch is empty")
+		return "", errors.New("manifest branch is empty")
+	}
+	if len(m.ParentCommits) > 1 {
+		return "", errors.New("merge commit diff is not supported")
+	}
+	if _, err := runGit(repoPath, "check-ref-format", "--branch", m.Branch); err != nil {
+		return "", fmt.Errorf("invalid manifest branch %q: %w", m.Branch, err)
 	}
 
+	indexFile, err := os.CreateTemp("", "bit-index-*")
+	if err != nil {
+		return "", err
+	}
+	indexPath := indexFile.Name()
+	if err := indexFile.Close(); err != nil {
+		return "", err
+	}
+	if err := os.Remove(indexPath); err != nil {
+		return "", err
+	}
+	defer os.Remove(indexPath)
+	indexEnv := []string{"GIT_INDEX_FILE=" + indexPath}
+
 	if len(m.ParentCommits) == 0 {
-		if _, err := runGit(repoPath, "symbolic-ref", "HEAD", "refs/heads/"+m.Branch); err != nil {
-			return err
+		if _, err := runGitEnv(repoPath, indexEnv, "read-tree", "--empty"); err != nil {
+			return "", err
 		}
 	} else {
 		for _, parent := range m.ParentCommits {
 			if _, err := runGit(repoPath, "cat-file", "-e", parent+"^{commit}"); err != nil {
-				return fmt.Errorf("missing parent commit %s: %w", parent, err)
+				return "", fmt.Errorf("missing parent commit %s: %w", parent, err)
 			}
 		}
-		if _, err := runGit(repoPath, "checkout", "-B", m.Branch, m.ParentCommits[0]); err != nil {
-			return err
+		if _, err := runGitEnv(repoPath, indexEnv, "read-tree", m.ParentCommits[0]+"^{tree}"); err != nil {
+			return "", err
 		}
 	}
 
 	if len(bytes.TrimSpace(diff)) > 0 {
-		if _, err := runGitInput(repoPath, diff, "apply", "--index", "--binary", "-"); err != nil {
-			return err
+		if _, err := runGitEnvInput(repoPath, indexEnv, diff, "apply", "--cached", "--binary", "-"); err != nil {
+			return "", err
 		}
 	}
 
-	treeOut, err := runGit(repoPath, "write-tree")
+	treeOut, err := runGitEnv(repoPath, indexEnv, "write-tree")
 	if err != nil {
-		return err
+		return "", err
 	}
 	treeHash := strings.TrimSpace(string(treeOut))
 	if treeHash != m.TreeHash {
-		return fmt.Errorf("rebuilt tree mismatch: got %s, want %s", treeHash, m.TreeHash)
+		return "", fmt.Errorf("rebuilt tree mismatch: got %s, want %s", treeHash, m.TreeHash)
 	}
 
 	args := []string{"commit-tree", treeHash}
 	for _, parent := range m.ParentCommits {
 		args = append(args, "-p", parent)
 	}
-	env := []string{
+	env := append(indexEnv, []string{
 		"GIT_AUTHOR_NAME=" + m.Author.Name,
 		"GIT_AUTHOR_EMAIL=" + m.Author.Email,
 		"GIT_AUTHOR_DATE=" + m.Author.Date,
 		"GIT_COMMITTER_NAME=" + m.Committer.Name,
 		"GIT_COMMITTER_EMAIL=" + m.Committer.Email,
 		"GIT_COMMITTER_DATE=" + m.Committer.Date,
-	}
+	}...)
 	commitOut, err := runGitEnvInput(repoPath, env, []byte(m.Message), args...)
 	if err != nil {
-		return err
+		return "", err
 	}
 	newHash := strings.TrimSpace(string(commitOut))
 	if newHash != m.GitCommit {
-		return fmt.Errorf("rebuilt commit mismatch: got %s, want %s", newHash, m.GitCommit)
+		return "", fmt.Errorf("rebuilt commit mismatch: got %s, want %s", newHash, m.GitCommit)
 	}
+	return newHash, nil
+}
 
-	if _, err := runGit(repoPath, "reset", "--hard", newHash); err != nil {
+func CheckoutBranch(repoPath, branch, commitHash string) error {
+	if branch == "" {
+		return errors.New("branch is empty")
+	}
+	if err := ensureCleanWorktree(repoPath); err != nil {
 		return err
 	}
-	return nil
+	_, err := runGit(repoPath, "checkout", "-B", branch, commitHash)
+	return err
+}
+
+func EnsureCleanWorktree(repoPath string) error {
+	return ensureCleanWorktree(repoPath)
 }
 
 func ensureCleanWorktree(repoPath string) error {
@@ -359,7 +409,12 @@ func ApplyBundle(repoPath string, data []byte) error {
 	// unbundle 출력에서 커밋 해시와 브랜치명 추출
 	// 출력 형식: "<commitHash> refs/heads/<branch>"
 	var commitHash, refName string
-	fmt.Sscanf(out.String(), "%s %s", &commitHash, &refName)
+	if _, err := fmt.Sscanf(out.String(), "%s %s", &commitHash, &refName); err != nil {
+		return fmt.Errorf("invalid git bundle output: %w", err)
+	}
+	if !strings.HasPrefix(refName, "refs/heads/") {
+		return fmt.Errorf("unsupported git bundle ref: %s", refName)
+	}
 	branch := refName[len("refs/heads/"):]
 
 	// 해당 브랜치로 checkout
