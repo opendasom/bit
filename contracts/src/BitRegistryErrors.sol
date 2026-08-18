@@ -8,9 +8,14 @@ abstract contract BitRegistryErrors {
     error MaintainerRequired();
     error ZeroUser();
     error ZeroCommit();
+    error ZeroBranch();
+    error ZeroTree();
+    error ZeroDigest();
     error StaleBranchHead();
     error MissingParent();
+    error RootCommitHasParent();
     error FirstParentMismatch();
+    error CommitAlreadyOnBranch();
     error CommitMetadataMismatch();
     error CommitNotFound();
     error TagExists();
@@ -24,4 +29,9 @@ abstract contract BitRegistryErrors {
     error UnauthorizedPullRequestAction();
     error MergeCommitNotSupported();
     error DescriptionTooLong();
+    error MetadataTooLong();
+    error LastOwnerRequired();
+    error SourceRoleRequired();
+    error TooManyPullRequestCommits();
+    error ForkTooLarge();
 }
