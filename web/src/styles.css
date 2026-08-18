@@ -74,27 +74,11 @@ button {
   color: inherit;
 }
 
-.brandMark {
-  position: relative;
-  width: 28px;
-  height: 28px;
-  border: 1px solid rgba(239, 243, 239, 0.22);
-  border-radius: 7px;
-  transform: rotate(45deg);
-}
-
-.brandMark span {
-  position: absolute;
-  inset: 6px;
-  border: 1px solid rgba(124, 211, 156, 0.22);
-}
-
-.brandMark span:nth-child(2) {
-  inset: 10px;
-}
-
-.brandMark span:nth-child(3) {
-  inset: 14px;
+.brandLogo {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  flex: 0 0 auto;
 }
 
 .brandName {
