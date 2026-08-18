@@ -16,16 +16,14 @@ import { foundry, sepolia } from "viem/chains";
 import bitRegistryArtifact from "../../internal/chain/artifacts/BitRegistry.json";
 import { PrDetailView } from "./components/PrDetailView";
 import { RepositoryList } from "./components/RepositoryList";
-import { APP_VERSION, LOG_BLOCK_RANGE, WORKFLOW_STEPS, type RoleLabel } from "./constants";
+import { APP_VERSION, WORKFLOW_STEPS, type RoleLabel } from "./constants";
 import "./styles.css";
 import type {
   BranchSummary,
-  CommitRecordedLog,
   CommitSummary,
   ForkCommitRecord,
   Manifest,
   PageState,
-  PullRequestCreatedLog,
   PullRequestSummary,
   RepoMetadata,
   RepoSummary,
@@ -371,85 +369,89 @@ function App() {
     }
   }
 
-  async function loadRepoPullRequests(repoId: bigint, repoLookup: RepoSummary[] = repos) {
+  async function loadRepoPullRequests(repoId: bigint) {
     try {
       const address = parseAddress(contractAddress);
-      const prIds = new Set<string>();
-
-      const prCount = (await publicClient.readContract({
-        address,
-        abi,
-        functionName: "getRepoPullRequestCount",
-        args: [repoId],
-      })) as bigint;
-      for (let index = 0n; index < prCount; index++) {
-        const prId = (await publicClient.readContract({
+      const [targetCount, sourceCount] = (await Promise.all([
+        publicClient.readContract({
           address,
           abi,
-          functionName: "getRepoPullRequestAt",
-          args: [repoId, index],
-        })) as bigint;
-        prIds.add(prId.toString());
-      }
+          functionName: "getRepoPullRequestCount",
+          args: [repoId],
+        }),
+        publicClient.readContract({
+          address,
+          abi,
+          functionName: "getSourceRepoPullRequestCount",
+          args: [repoId],
+        }),
+      ])) as [bigint, bigint];
 
-      try {
-        const latestBlock = await publicClient.getBlockNumber({ cacheTime: 0 });
-        for (let fromBlock = 0n; fromBlock <= latestBlock; fromBlock += LOG_BLOCK_RANGE) {
-          const toBlock = fromBlock + LOG_BLOCK_RANGE - 1n > latestBlock ? latestBlock : fromBlock + LOG_BLOCK_RANGE - 1n;
-          const logs = (await publicClient.getContractEvents({
+      async function readPullRequestIds(
+        functionName: "getRepoPullRequestIds" | "getSourceRepoPullRequestIds",
+        total: bigint,
+      ): Promise<bigint[]> {
+        const ids: bigint[] = [];
+        const pageSize = 100n;
+        for (let start = 0n; start < total; start += pageSize) {
+          const page = (await publicClient.readContract({
             address,
             abi,
-            eventName: "PullRequestCreated",
-            args: { sourceRepoId: repoId },
-            fromBlock,
-            toBlock,
-          })) as unknown as PullRequestCreatedLog[];
-          for (const log of logs) {
-            if (log.args.prId != null) prIds.add(log.args.prId.toString());
-          }
+            functionName,
+            args: [repoId, start, pageSize],
+          })) as bigint[];
+          ids.push(...page);
         }
-      } catch (err) {
-        console.warn("Source pull-request discovery is unavailable; showing indexed target pull requests only.", err);
+        return ids;
       }
 
-      const nextPullRequests: PullRequestSummary[] = [];
-      for (const prId of prIds) {
-        const pr = (await publicClient.readContract({
-          address,
-          abi,
-          functionName: "getPullRequest",
-          args: [BigInt(prId)],
-        })) as PullRequestSummary;
-        nextPullRequests.push({
-          id: pr.id,
-          targetRepoId: pr.targetRepoId,
-          targetBranch: pr.targetBranch,
-          sourceRepoId: pr.sourceRepoId,
-          sourceBranch: pr.sourceBranch,
-          baseCommit: pr.baseCommit,
-          sourceHeadCommit: pr.sourceHeadCommit,
-          author: pr.author,
-          status: BigInt(pr.status as number | bigint),
-          createdAt: pr.createdAt,
-          updatedAt: pr.updatedAt,
-          description: pr.description ? hexToString(pr.description as Hex) : "",
-        });
-      }
+      const [targetIds, sourceIds] = await Promise.all([
+        readPullRequestIds("getRepoPullRequestIds", targetCount),
+        readPullRequestIds("getSourceRepoPullRequestIds", sourceCount),
+      ]);
+      const prIds = Array.from(new Set([...targetIds, ...sourceIds].map((prId) => prId.toString())), BigInt);
+
+      const nextPullRequests = await Promise.all(
+        prIds.map(async (prId): Promise<PullRequestSummary> => {
+          const pr = (await publicClient.readContract({
+            address,
+            abi,
+            functionName: "getPullRequest",
+            args: [prId],
+          })) as PullRequestSummary;
+          return {
+            id: pr.id,
+            targetRepoId: pr.targetRepoId,
+            targetBranch: pr.targetBranch,
+            sourceRepoId: pr.sourceRepoId,
+            sourceBranch: pr.sourceBranch,
+            baseCommit: pr.baseCommit,
+            sourceHeadCommit: pr.sourceHeadCommit,
+            author: pr.author,
+            status: BigInt(pr.status as number | bigint),
+            createdAt: pr.createdAt,
+            updatedAt: pr.updatedAt,
+            description: pr.description ? hexToString(pr.description as Hex) : "",
+          };
+        }),
+      );
       nextPullRequests.sort((left, right) => (left.id < right.id ? 1 : left.id > right.id ? -1 : 0));
       setPullRequests(nextPullRequests);
 
       if (walletAddress) {
         const targetRepoIds = new Set(nextPullRequests.map((pr) => pr.targetRepoId.toString()));
-        const roles = new Map<string, RoleLabel>();
-        for (const targetRepoId of targetRepoIds) {
-          const role = (await publicClient.readContract({
-            address,
-            abi,
-            functionName: "getRole",
-            args: [BigInt(targetRepoId), walletAddress],
-          })) as bigint;
-          roles.set(targetRepoId, roleToLabel(role));
-        }
+        const roleEntries = await Promise.all(
+          Array.from(targetRepoIds, async (targetRepoId): Promise<[string, RoleLabel]> => {
+            const role = (await publicClient.readContract({
+              address,
+              abi,
+              functionName: "getRole",
+              args: [BigInt(targetRepoId), walletAddress],
+            })) as bigint;
+            return [targetRepoId, roleToLabel(role)];
+          }),
+        );
+        const roles = new Map<string, RoleLabel>(roleEntries);
         setRoleByTargetRepo(roles);
       }
     } catch (err) {
@@ -459,38 +461,56 @@ function App() {
 
   async function loadRepoBranches(repoId: bigint, repoLookup: RepoSummary[] = repos, defaultBranch = "main") {
     try {
+      const address = parseAddress(contractAddress);
       const repo = repoLookup.find((item) => item.id === repoId) ?? selectedRepo;
-      const latestBlock = await publicClient.getBlockNumber({ cacheTime: 0 });
-      const logs: CommitRecordedLog[] = [];
-      for (let fromBlock = 0n; fromBlock <= latestBlock; fromBlock += LOG_BLOCK_RANGE) {
-        const toBlock = fromBlock + LOG_BLOCK_RANGE - 1n > latestBlock ? latestBlock : fromBlock + LOG_BLOCK_RANGE - 1n;
-        const page = (await publicClient.getContractEvents({
-          address: parseAddress(contractAddress),
+      const branchCount = (await publicClient.readContract({
+        address,
+        abi,
+        functionName: "getRepoBranchCount",
+        args: [repoId],
+      })) as bigint;
+
+      const branchKeys: Hex[] = [];
+      const headCommits: Hex[] = [];
+      const historyLengths: bigint[] = [];
+      const headManifestDigests: Hex[] = [];
+      const pageSize = 100n;
+      for (let start = 0n; start < branchCount; start += pageSize) {
+        const [pageKeys, pageHeads, pageLengths, pageDigests] = (await publicClient.readContract({
+          address,
           abi,
-          eventName: "CommitRecorded",
-          args: { repoId },
-          fromBlock,
-          toBlock,
-        })) as unknown as CommitRecordedLog[];
-        logs.push(...page);
+          functionName: "getRepoBranches",
+          args: [repoId, start, pageSize],
+        })) as [Hex[], Hex[], bigint[], Hex[]];
+        branchKeys.push(...pageKeys);
+        headCommits.push(...pageHeads);
+        historyLengths.push(...pageLengths);
+        headManifestDigests.push(...pageDigests);
       }
 
-      const nextBranches = new Map<string, BranchSummary>();
-      for (const log of logs) {
-        const manifestCID = cidV0FromDigest(log.args.manifestDigest!);
-        const manifest = await getManifest(ipfsGateway, manifestCID);
-        const branchName = manifest.branch || defaultBranch || repo?.metadata?.defaultBranch || "main";
-        nextBranches.set(branchName, {
-          name: branchName,
-          branchHash: keccak256(stringToBytes(branchName)),
-          commitCount: (nextBranches.get(branchName)?.commitCount ?? 0) + 1,
-          headCommit: bytes20HexToGitHash(log.args.commitHash!),
-        });
-      }
+      const configuredDefaultBranch = defaultBranch || repo?.metadata?.defaultBranch || "main";
+      const configuredDefaultKey = keccak256(stringToBytes(configuredDefaultBranch));
+      const nextBranches = await Promise.all(
+        branchKeys.map(async (branchKey, index): Promise<BranchSummary> => {
+          const manifestCID = cidV0FromDigest(headManifestDigests[index]);
+          const manifest = await getManifest(ipfsGateway, manifestCID);
+          const branchName =
+            manifest.branch ||
+            (branchKey.toLowerCase() === configuredDefaultKey.toLowerCase()
+              ? configuredDefaultBranch
+              : shortHex(branchKey));
+          return {
+            name: branchName,
+            branchHash: branchKey,
+            commitCount: Number(historyLengths[index]),
+            headCommit: bytes20HexToGitHash(headCommits[index]),
+          };
+        }),
+      );
 
-      const sorted = Array.from(nextBranches.values()).sort((left, right) => {
-        if (left.name === defaultBranch) return -1;
-        if (right.name === defaultBranch) return 1;
+      const sorted = nextBranches.sort((left, right) => {
+        if (left.name === configuredDefaultBranch) return -1;
+        if (right.name === configuredDefaultBranch) return 1;
         return left.name.localeCompare(right.name);
       });
       setBranches(sorted);
