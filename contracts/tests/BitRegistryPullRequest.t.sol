@@ -60,6 +60,7 @@ contract BitRegistryPullRequestTest {
     RegistryActor private stranger;
 
     bytes32 private constant MAIN = keccak256("main");
+    bytes32 private constant FEATURE = keccak256("feature");
 
     bytes20 private constant A = hex"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     bytes20 private constant B = hex"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -90,6 +91,41 @@ contract BitRegistryPullRequestTest {
         require(keccak256(pr.description) == keccak256("adds feature X"), "wrong description");
         require(registry.getRepoPullRequestCount(targetRepoId) == 1, "wrong pr count");
         require(registry.getRepoPullRequestAt(targetRepoId, 0) == prId, "wrong pr index");
+        require(registry.getSourceRepoPullRequestCount(sourceRepoId) == 1, "wrong source pr count");
+        require(registry.getSourceRepoPullRequestAt(sourceRepoId, 0) == prId, "wrong source pr index");
+
+        uint256[] memory targetIds = registry.getRepoPullRequestIds(targetRepoId, 0, 10);
+        uint256[] memory sourceIds = registry.getSourceRepoPullRequestIds(sourceRepoId, 0, 10);
+        require(targetIds.length == 1 && targetIds[0] == prId, "wrong target pr page");
+        require(sourceIds.length == 1 && sourceIds[0] == prId, "wrong source pr page");
+        require(registry.getRepoPullRequestIds(targetRepoId, 1, 10).length == 0, "target page should be empty");
+        require(
+            registry.getSourceRepoPullRequestIds(sourceRepoId, 0, 0).length == 0,
+            "zero-sized source page should be empty"
+        );
+    }
+
+    function testEnumeratesBranchesWithoutDuplicatesAndPaginates() public {
+        uint256 repoId = targetOwner.createRepo();
+        _record(targetOwner, repoId, A, bytes20(0));
+        _record(targetOwner, repoId, B, A);
+        _recordOnBranch(targetOwner, repoId, FEATURE, C, bytes20(0));
+        _recordOnBranch(targetOwner, repoId, FEATURE, D, C);
+
+        require(registry.getRepoBranchCount(repoId) == 2, "wrong branch count");
+        (bytes32[] memory keys, bytes20[] memory heads, uint256[] memory lengths, bytes32[] memory digests) =
+            registry.getRepoBranches(repoId, 0, 10);
+        require(keys.length == 2, "wrong branch page length");
+        require(keys[0] == MAIN && keys[1] == FEATURE, "wrong branch keys");
+        require(heads[0] == B && heads[1] == D, "wrong branch heads");
+        require(lengths[0] == 2 && lengths[1] == 2, "wrong branch history lengths");
+        require(digests[0] == _digest(B, 1) && digests[1] == _digest(D, 1), "wrong head manifests");
+
+        (bytes32[] memory pageKeys, bytes20[] memory pageHeads,,) = registry.getRepoBranches(repoId, 1, 1);
+        require(pageKeys.length == 1 && pageKeys[0] == FEATURE, "wrong paginated branch key");
+        require(pageHeads.length == 1 && pageHeads[0] == D, "wrong paginated branch head");
+        (bytes32[] memory emptyKeys,,,) = registry.getRepoBranches(repoId, 2, 10);
+        require(emptyKeys.length == 0, "branch page should be empty");
     }
 
     function testCreatePullRequestRevertsWhenDescriptionTooLong() public {
@@ -122,6 +158,23 @@ contract BitRegistryPullRequestTest {
 
         BitRegistryTypes.PullRequest memory pr = registry.getPullRequest(prId);
         require(pr.status == BitRegistryTypes.PullRequestStatus.Approved, "pr was not approved");
+    }
+
+    function testApprovePullRequestRegistersPreviouslyEmptyTargetBranch() public {
+        uint256 targetRepoId = targetOwner.createRepo();
+        uint256 sourceRepoId = sourceOwner.createRepo();
+        _recordOnBranch(sourceOwner, sourceRepoId, FEATURE, C, bytes20(0));
+        _recordOnBranch(sourceOwner, sourceRepoId, FEATURE, D, C);
+
+        uint256 prId = sourceOwner.createPullRequest(targetRepoId, FEATURE, sourceRepoId, FEATURE, "new branch");
+        targetOwner.approvePullRequest(prId);
+
+        require(registry.getRepoBranchCount(targetRepoId) == 1, "target branch was not indexed");
+        (bytes32[] memory keys, bytes20[] memory heads, uint256[] memory lengths,) =
+            registry.getRepoBranches(targetRepoId, 0, 10);
+        require(keys.length == 1 && keys[0] == FEATURE, "wrong target branch key");
+        require(heads[0] == D, "wrong target branch head");
+        require(lengths[0] == 2, "wrong target branch length");
     }
 
     function testApprovePullRequestRevertsWhenTargetMoved() public {
@@ -182,9 +235,19 @@ contract BitRegistryPullRequestTest {
     }
 
     function _record(RegistryActor actor, uint256 repoId, bytes20 commitHash, bytes20 parent) private {
+        _recordOnBranch(actor, repoId, MAIN, commitHash, parent);
+    }
+
+    function _recordOnBranch(
+        RegistryActor actor,
+        uint256 repoId,
+        bytes32 branch,
+        bytes20 commitHash,
+        bytes20 parent
+    ) private {
         actor.recordCommit(
             repoId,
-            MAIN,
+            branch,
             parent,
             commitHash,
             commitHash,
