@@ -2,28 +2,61 @@
   <img src="public/bit-logo.png" alt="Bit logo" width="300" />
 </p>
 
-# Bit
+<h1 align="center">Bit</h1>
+
+<p align="center">
+  <strong>An open protocol for verifiable source history.</strong><br />
+  Git-compatible workflows, content-addressed data on IPFS, and repository state verified on Ethereum.
+</p>
+
+<p align="center">
+  <a href="https://github.com/opendasom/bit/actions/workflows/ci.yml"><img src="https://github.com/opendasom/bit/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-7cd39c?style=flat-square" alt="MIT License" /></a>
+  <img src="https://img.shields.io/badge/status-alpha-f3ae84?style=flat-square" alt="Alpha status" />
+</p>
+
+<p align="center">
+  <a href="#빠른-시작">Quick start</a> ·
+  <a href="#데모">Demos</a> ·
+  <a href="#명령어-참조">CLI reference</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a> ·
+  <a href="SECURITY.md">Security</a>
+</p>
 
 IPFS와 이더리움 위에서 동작하는 실험적 분산 버전 관리 프로토콜입니다. 커밋 diff와 메타데이터는 IPFS에, 브랜치·커밋 상태는 `BitRegistry` 스마트 컨트랙트에 저장합니다.
 
-> **Status: Alpha.** 프로토콜과 저장 형식은 변경될 수 있으며, 프로덕션 사용이나 실제 자산이 걸린 환경을 위한 보안 감사를 받지 않았습니다.
+> [!WARNING]
+> **Alpha software.** 프로토콜과 저장 형식은 변경될 수 있으며, 프로덕션 사용이나 실제 자산이 걸린 환경을 위한 보안 감사를 받지 않았습니다.
 
 중앙 Git 서버 없이 코드 히스토리를 content-addressed 형태로 저장하고 누구나 검증할 수 있습니다. 온체인 레코드는 히스토리의 무결성을 검증할 수 있게 하지만, IPFS 데이터의 가용성은 핀(pin)과 복제 상태에 달려 있습니다. 중요한 데이터는 자체 IPFS 노드 또는 신뢰할 수 있는 pinning 서비스에 보관하세요.
 
----
+## 핵심 구성
 
-## 영상
+| 계층 | Bit가 하는 일 |
+|---|---|
+| **Git client** | 익숙한 Git 저장소와 커밋을 로컬에서 생성하고, `bit` CLI로 원격 상태와 동기화합니다. |
+| **IPFS** | diff, manifest, repository metadata를 content-addressed 객체로 저장하고 복제합니다. |
+| **Ethereum** | `BitRegistry`가 repository·branch head·commit CID·역할을 기록해 상태와 권한을 검증합니다. |
+| **Web explorer** | IPFS와 체인 상태를 읽고, MetaMask 서명으로 fork·역할·PR 작업을 수행합니다. |
 
-1. Maintainer Creating Repository  
-[![Video Label](http://img.youtube.com/vi/f56hsj97zWA/0.jpg)](https://youtu.be/f56hsj97zWA)
+## 데모
 
-2. Contributor Developing  
-[![Video Label](http://img.youtube.com/vi/HiM1U8WBm3g/0.jpg)](https://youtu.be/HiM1U8WBm3g)
-
-3. Maintainer Approving PR  
-[![Video Label](http://img.youtube.com/vi/qIJjybwHhjo/0.jpg)](https://youtu.be/qIJjybwHhjo)
-
----
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <a href="https://youtu.be/f56hsj97zWA"><img src="https://img.youtube.com/vi/f56hsj97zWA/0.jpg" alt="Maintainer creating a repository" /></a><br />
+      <strong>Maintainer creates a repository</strong>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://youtu.be/HiM1U8WBm3g"><img src="https://img.youtube.com/vi/HiM1U8WBm3g/0.jpg" alt="Contributor developing" /></a><br />
+      <strong>Contributor develops a change</strong>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://youtu.be/qIJjybwHhjo"><img src="https://img.youtube.com/vi/qIJjybwHhjo/0.jpg" alt="Maintainer approving a pull request" /></a><br />
+      <strong>Maintainer approves a pull request</strong>
+    </td>
+  </tr>
+</table>
 
 ## 설치
 
