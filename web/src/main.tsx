@@ -115,6 +115,11 @@ function App() {
     }
     return map;
   }, [branches]);
+
+  function repoRouteKey(repoId: bigint, branch: string): string {
+    return `${contractAddress}:${repoId.toString()}:${branch}:${walletAddress?.toLowerCase() ?? "anonymous"}`;
+  }
+
   useEffect(() => {
     const onPopState = () => {
       const nextRoute = routeFromLocation(window.location.pathname, window.location.search);
@@ -150,11 +155,11 @@ function App() {
     if (!/^0x[a-fA-F0-9]{40}$/.test(contractAddress)) return;
     const repo = repos.find((item) => item.id === selectedRepoId);
     const branch = selectedBranch || repo?.metadata?.defaultBranch || "main";
-    const routeKey = `${contractAddress}:${selectedRepoId.toString()}:${branch}`;
+    const routeKey = repoRouteKey(selectedRepoId, branch);
     if (autoLoadedRouteRef.current === routeKey) return;
     autoLoadedRouteRef.current = routeKey;
     void loadRepoDetail(selectedRepoId, repos, branch);
-  }, [page, repos, selectedRepoId, selectedBranch, contractAddress]);
+  }, [page, repos, selectedRepoId, selectedBranch, contractAddress, walletAddress]);
 
   useEffect(() => {
     if (selectedPrId === null) {
@@ -266,7 +271,7 @@ function App() {
     setSelectedPrId(null);
     setPrFilter("open");
     setActiveTab("commits");
-    autoLoadedRouteRef.current = `${contractAddress}:${repoId.toString()}:${branch}`;
+    autoLoadedRouteRef.current = repoRouteKey(repoId, branch);
     await loadRepoDetail(repoId, repos, branch);
   }
 
@@ -509,9 +514,6 @@ function App() {
       setWalletAddress(accounts[0] as Address);
       setWalletChainId(chainId);
       setError("");
-      if (page === "project" && selectedRepoId) {
-        void loadRepoDetail(selectedRepoId);
-      }
     } catch (err) {
       setError(errorMessage(err));
     }
@@ -789,7 +791,7 @@ function App() {
       setSelectedBranch(branch);
       setSelectedPrId(null);
       setActiveTab("commits");
-      autoLoadedRouteRef.current = `${contractAddress}:${forkRepoId.toString()}:${branch}`;
+      autoLoadedRouteRef.current = repoRouteKey(forkRepoId, branch);
       await loadRepoDetail(forkRepoId, nextRepos, branch);
     } catch (err) {
       const suffix = forkRepoId ? ` Fork repo #${forkRepoId.toString()} may be partially copied; do not retry without checking it first.` : "";
@@ -1199,7 +1201,7 @@ function App() {
                             window.history.pushState({}, "", nextPath);
                             setSelectedBranch(branch.name);
                             setSelectedPrId(null);
-                            autoLoadedRouteRef.current = `${contractAddress}:${detailRepo.id.toString()}:${branch.name}`;
+                            autoLoadedRouteRef.current = repoRouteKey(detailRepo.id, branch.name);
                             void loadRepoDetail(detailRepo.id, repos, branch.name);
                           }}
                         >
