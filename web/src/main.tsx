@@ -387,20 +387,24 @@ function App() {
         prIds.add(prId.toString());
       }
 
-      const latestBlock = await publicClient.getBlockNumber({ cacheTime: 0 });
-      for (let fromBlock = 0n; fromBlock <= latestBlock; fromBlock += LOG_BLOCK_RANGE) {
-        const toBlock = fromBlock + LOG_BLOCK_RANGE - 1n > latestBlock ? latestBlock : fromBlock + LOG_BLOCK_RANGE - 1n;
-        const logs = (await publicClient.getContractEvents({
-          address,
-          abi,
-          eventName: "PullRequestCreated",
-          args: { sourceRepoId: repoId },
-          fromBlock,
-          toBlock,
-        })) as unknown as PullRequestCreatedLog[];
-        for (const log of logs) {
-          if (log.args.prId != null) prIds.add(log.args.prId.toString());
+      try {
+        const latestBlock = await publicClient.getBlockNumber({ cacheTime: 0 });
+        for (let fromBlock = 0n; fromBlock <= latestBlock; fromBlock += LOG_BLOCK_RANGE) {
+          const toBlock = fromBlock + LOG_BLOCK_RANGE - 1n > latestBlock ? latestBlock : fromBlock + LOG_BLOCK_RANGE - 1n;
+          const logs = (await publicClient.getContractEvents({
+            address,
+            abi,
+            eventName: "PullRequestCreated",
+            args: { sourceRepoId: repoId },
+            fromBlock,
+            toBlock,
+          })) as unknown as PullRequestCreatedLog[];
+          for (const log of logs) {
+            if (log.args.prId != null) prIds.add(log.args.prId.toString());
+          }
         }
+      } catch (err) {
+        console.warn("Source pull-request discovery is unavailable; showing indexed target pull requests only.", err);
       }
 
       const nextPullRequests: PullRequestSummary[] = [];
