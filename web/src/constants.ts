@@ -1,7 +1,6 @@
 import type { WorkflowStep } from "./types";
 
 export const APP_VERSION = "1.1.0";
-export const LOG_BLOCK_RANGE = 50_000n;
 export const REPOSITORIES_PER_PAGE = 6;
 export const ROLE_LABELS = ["None", "Contributor", "Maintainer", "Owner"] as const;
 export type RoleLabel = (typeof ROLE_LABELS)[number];

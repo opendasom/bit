@@ -35,6 +35,8 @@ abstract contract BitRegistryTypes {
         mapping(address => Role) roles;
         mapping(bytes32 => bytes20) branchCommits;
         mapping(bytes32 => bytes20[]) branchHistory;
+        bytes32[] branchKeys;
+        mapping(bytes32 => bool) branchExists;
         mapping(bytes20 => CommitRecord) commits;
         mapping(bytes32 => bytes) tags;
         mapping(bytes32 => bool) tagExists;
