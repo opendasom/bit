@@ -31,10 +31,12 @@ abstract contract BitRegistryTypes {
 
     struct Repo {
         address owner;
+        uint256 ownerCount;
         bytes metadataCID;
         mapping(address => Role) roles;
         mapping(bytes32 => bytes20) branchCommits;
         mapping(bytes32 => bytes20[]) branchHistory;
+        mapping(bytes32 => mapping(bytes20 => uint256)) branchCommitPositions;
         bytes32[] branchKeys;
         mapping(bytes32 => bool) branchExists;
         mapping(bytes20 => CommitRecord) commits;
@@ -55,5 +57,7 @@ abstract contract BitRegistryTypes {
         uint256 createdAt;
         uint256 updatedAt;
         bytes description;
+        uint256 sourceStart;
+        uint256 sourceEnd;
     }
 }

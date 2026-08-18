@@ -23,7 +23,6 @@ type fakeChainClient struct {
 	getBranchCommitsWithMetadata func(repoID *big.Int, branch string, start, limit *big.Int) ([]chain.BranchCommitRecord, error)
 	recordCommit                 func(repoID *big.Int, branch string, expectedOldCommit, commitHash, treeHash [20]byte, parentHashes [][20]byte, manifestDigest, diffDigest [32]byte) error
 	createRepo                   func(metadataCID string) (*big.Int, error)
-	createPullRequest            func(targetRepoID *big.Int, targetBranch string, sourceRepoID *big.Int, sourceBranch string) (*big.Int, error)
 }
 
 func (f *fakeChainClient) GetBranchCommit(repoID *big.Int, branch string) ([20]byte, error) {
@@ -68,13 +67,6 @@ func (f *fakeChainClient) CreateRepo(metadataCID string) (*big.Int, error) {
 		return nil, fmt.Errorf("createRepo not stubbed")
 	}
 	return f.createRepo(metadataCID)
-}
-
-func (f *fakeChainClient) CreatePullRequest(targetRepoID *big.Int, targetBranch string, sourceRepoID *big.Int, sourceBranch string) (*big.Int, error) {
-	if f.createPullRequest == nil {
-		return nil, fmt.Errorf("createPullRequest not stubbed")
-	}
-	return f.createPullRequest(targetRepoID, targetBranch, sourceRepoID, sourceBranch)
 }
 
 // fakeIPFSClient is an in-memory content store keyed by a real CIDv0
@@ -124,7 +116,7 @@ func newTestRepo(t *testing.T) string {
 }
 
 // newEmptyRepoDir creates a bare-uninitialized-HEAD git repo directory
-// suitable as a Pull/Fork destination.
+// suitable as a Pull destination.
 func newEmptyRepoDir(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()

@@ -11,6 +11,7 @@ abstract contract PullRequestRegistry is CommitRegistry {
     mapping(uint256 => uint256[]) private sourceRepoPullRequests;
 
     uint256 public constant MAX_PR_DESCRIPTION_LENGTH = 2048;
+    uint256 public constant MAX_PR_COMMITS = 64;
 
     function createPullRequest(
         uint256 targetRepoId,
@@ -20,6 +21,8 @@ abstract contract PullRequestRegistry is CommitRegistry {
         bytes calldata description
     ) external repoExists(targetRepoId) repoExists(sourceRepoId) returns (uint256 prId) {
         if (description.length > MAX_PR_DESCRIPTION_LENGTH) revert DescriptionTooLong();
+        if (targetBranch == bytes32(0) || sourceBranch == bytes32(0)) revert ZeroBranch();
+        if (!_isMaintainer(sourceRepoId, msg.sender)) revert SourceRoleRequired();
 
         Repo storage targetRepo = repos[targetRepoId];
         Repo storage sourceRepo = repos[sourceRepoId];
@@ -27,7 +30,8 @@ abstract contract PullRequestRegistry is CommitRegistry {
         bytes20 sourceHeadCommit = sourceRepo.branchCommits[sourceBranch];
         if (sourceHeadCommit == bytes20(0)) revert EmptySourceBranch();
 
-        _getPullRequestCommitRange(sourceRepo, sourceBranch, baseCommit, sourceHeadCommit);
+        (uint256 sourceStart, uint256 sourceEnd) =
+            _getPullRequestCommitRange(sourceRepo, sourceBranch, baseCommit, sourceHeadCommit);
 
         prId = nextPullRequestId++;
         pullRequests[prId] = PullRequest({
@@ -42,7 +46,9 @@ abstract contract PullRequestRegistry is CommitRegistry {
             status: PullRequestStatus.Open,
             createdAt: block.timestamp,
             updatedAt: block.timestamp,
-            description: description
+            description: description,
+            sourceStart: sourceStart,
+            sourceEnd: sourceEnd
         });
         repoPullRequests[targetRepoId].push(prId);
         sourceRepoPullRequests[sourceRepoId].push(prId);
@@ -71,6 +77,7 @@ abstract contract PullRequestRegistry is CommitRegistry {
 
         (uint256 start, uint256 end) =
             _getPullRequestCommitRange(sourceRepo, pr.sourceBranch, pr.baseCommit, pr.sourceHeadCommit);
+        if (start != pr.sourceStart || end != pr.sourceEnd) revert CommitMetadataMismatch();
 
         _registerBranch(targetRepo, pr.targetBranch);
         bytes20 currentHead = oldHead;
@@ -86,8 +93,7 @@ abstract contract PullRequestRegistry is CommitRegistry {
                 if (item.parents[0] != currentHead) revert FirstParentMismatch();
             }
 
-            targetRepo.branchCommits[pr.targetBranch] = commitHash;
-            targetRepo.branchHistory[pr.targetBranch].push(commitHash);
+            _appendBranchCommit(targetRepo, pr.targetBranch, commitHash);
             newHead = commitHash;
 
             emit CommitRecorded(
@@ -103,7 +109,9 @@ abstract contract PullRequestRegistry is CommitRegistry {
             emit BranchUpdated(
                 pr.targetRepoId,
                 pr.targetBranch,
-                currentHead == bytes20(0) ? bytes("") : abi.encodePacked(targetRepo.commits[currentHead].manifestDigest),
+                currentHead == bytes20(0)
+                    ? bytes("")
+                    : abi.encodePacked(targetRepo.commits[currentHead].manifestDigest),
                 abi.encodePacked(item.manifestDigest),
                 abi.encodePacked(commitHash),
                 item.parents.length == 0 ? bytes("") : abi.encodePacked(item.parents[0]),
@@ -210,28 +218,14 @@ abstract contract PullRequestRegistry is CommitRegistry {
         bytes20 baseCommit,
         bytes20 sourceHeadCommit
     ) private view returns (uint256 start, uint256 end) {
-        bytes20[] storage history = sourceRepo.branchHistory[sourceBranch];
         if (sourceHeadCommit == bytes20(0)) revert EmptySourceBranch();
-
-        bool foundBase = baseCommit == bytes20(0);
-        bool foundHead;
-        start = 0;
-        for (uint256 i = 0; i < history.length; i++) {
-            bytes20 commitHash = history[i];
-            if (!foundBase && commitHash == baseCommit) {
-                foundBase = true;
-                start = i + 1;
-                continue;
-            }
-            if (foundBase && commitHash == sourceHeadCommit) {
-                foundHead = true;
-                end = i + 1;
-                break;
-            }
+        end = sourceRepo.branchCommitPositions[sourceBranch][sourceHeadCommit];
+        if (end == 0) revert SourceHeadNotFound();
+        if (baseCommit != bytes20(0)) {
+            start = sourceRepo.branchCommitPositions[sourceBranch][baseCommit];
+            if (start == 0 || start >= end) revert SourceHistoryDoesNotContainBase();
         }
-
-        if (!foundBase) revert SourceHistoryDoesNotContainBase();
-        if (!foundHead) revert SourceHeadNotFound();
         if (start >= end) revert NoCommitsToMerge();
+        if (end - start > MAX_PR_COMMITS) revert TooManyPullRequestCommits();
     }
 }

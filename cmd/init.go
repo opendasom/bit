@@ -35,6 +35,13 @@ var initCmd = &cobra.Command{
 		if defaultBranch == "" {
 			defaultBranch = "main"
 		}
+		privateKey, err := resolveSigningKey(privateKey, nil)
+		if err != nil {
+			return err
+		}
+		if err := config.EnsureLocalExclude("."); err != nil {
+			return fmt.Errorf(".bit Git 제외 설정 실패: %w", err)
+		}
 
 		metadata := &repo.Metadata{
 			Version:       repo.MetadataVersion,
@@ -47,6 +54,7 @@ var initCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("체인 연결 실패: %w", err)
 		}
+		defer chainClient.Close()
 		ipfsClient := ipfs.NewClient(ipfsURL)
 
 		repoID, metadataCID, err := app.Init(chainClient, ipfsClient, metadata)
@@ -60,7 +68,6 @@ var initCmd = &cobra.Command{
 		cfg := &config.Config{
 			RPCURL:          rpcURL,
 			ContractAddress: contractAddress,
-			PrivateKey:      privateKey,
 			IPFSURL:         ipfsURL,
 			Remotes:         make(map[string]config.Remote),
 			RepoID:          repoID.Uint64(),
@@ -77,7 +84,7 @@ var initCmd = &cobra.Command{
 func init() {
 	initCmd.Flags().String("rpc", "", "이더리움 RPC URL (예: https://mainnet.infura.io/v3/...)")
 	initCmd.Flags().String("contract", "", "BitRegistry 컨트랙트 주소")
-	initCmd.Flags().String("key", "", "지갑 개인키 (0x 제외)")
+	initCmd.Flags().String("key", "", "deprecated: 지갑 개인키; BIT_PRIVATE_KEY 환경변수 사용 권장")
 	initCmd.Flags().String("ipfs", "http://localhost:5001", "IPFS 노드 주소")
 	initCmd.Flags().String("name", "", "웹에 표시할 저장소 이름 (기본값: 현재 디렉토리명)")
 	initCmd.Flags().String("description", "", "웹에 표시할 저장소 설명")
@@ -85,7 +92,6 @@ func init() {
 
 	initCmd.MarkFlagRequired("rpc")
 	initCmd.MarkFlagRequired("contract")
-	initCmd.MarkFlagRequired("key")
 
 	rootCmd.AddCommand(initCmd)
 }

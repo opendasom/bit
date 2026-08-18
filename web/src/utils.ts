@@ -1,37 +1,63 @@
-import { decodeEventLog, type Address, type Hex } from "viem";
+import { decodeEventLog, keccak256, stringToBytes, type Address, type Hex } from "viem";
 import bitRegistryArtifact from "../../internal/chain/artifacts/BitRegistry.json";
 import { PR_STATUS_LABELS, ROLE_LABELS, type RoleLabel } from "./constants";
 import type { Manifest, PageState } from "./types";
 
 const abi = bitRegistryArtifact.abi;
 const manifestCache = new Map<string, Manifest>();
+const IPFS_FETCH_TIMEOUT_MS = 15_000;
+const MAX_IPFS_JSON_BYTES = 2 * 1024 * 1024;
 
 export function routeFromLocation(
   pathname: string,
   search: string,
-): { page: PageState; repoId: bigint | null; branch: string | null; prId: bigint | null } {
+): {
+  page: PageState;
+  repoId: bigint | null;
+  branch: string | null;
+  prId: bigint | null;
+} {
   const forkMatch = pathname.match(/^\/projects\/(\d+)\/fork\/?$/);
   if (forkMatch) {
     const params = new URLSearchParams(search);
-    return { page: "fork", repoId: BigInt(forkMatch[1]), branch: params.get("branch"), prId: null };
+    return {
+      page: "fork",
+      repoId: BigInt(forkMatch[1]),
+      branch: params.get("branch"),
+      prId: null,
+    };
   }
   const prMatch = pathname.match(/^\/projects\/(\d+)\/prs\/(\d+)\/?$/);
   if (prMatch) {
     const params = new URLSearchParams(search);
-    return { page: "project", repoId: BigInt(prMatch[1]), branch: params.get("branch"), prId: BigInt(prMatch[2]) };
+    return {
+      page: "project",
+      repoId: BigInt(prMatch[1]),
+      branch: params.get("branch"),
+      prId: BigInt(prMatch[2]),
+    };
   }
   const match = pathname.match(/^\/projects\/(\d+)\/?$/);
   if (!match) {
     return { page: "home", repoId: null, branch: null, prId: null };
   }
   const params = new URLSearchParams(search);
-  return { page: "project", repoId: BigInt(match[1]), branch: params.get("branch"), prId: null };
+  return {
+    page: "project",
+    repoId: BigInt(match[1]),
+    branch: params.get("branch"),
+    prId: null,
+  };
 }
 
 export function repoIdFromCreateReceipt(logs: readonly { data: Hex; topics: readonly Hex[] }[]): bigint {
   for (const log of logs) {
     try {
-      const decoded = decodeEventLog({ abi, data: log.data, topics: [...log.topics] as [Hex, ...Hex[]] });
+      const decoded = decodeEventLog({
+        abi,
+        data: log.data,
+        topics: [...log.topics] as [Hex, ...Hex[]],
+      });
       if (decoded.eventName === "RepoCreated") {
         const repoId = (decoded.args as { repoId?: bigint }).repoId;
         if (repoId !== undefined) return repoId;
@@ -99,11 +125,23 @@ export function ipfsURL(gateway: string, cid: string): string {
 }
 
 export async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`IPFS fetch failed (${response.status})`);
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), IPFS_FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`IPFS fetch failed (${response.status})`);
+    }
+    const text = await readLimitedText(response, MAX_IPFS_JSON_BYTES);
+    return JSON.parse(text) as T;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error(`IPFS fetch timed out after ${IPFS_FETCH_TIMEOUT_MS / 1000}s`);
+    }
+    throw err;
+  } finally {
+    window.clearTimeout(timeout);
   }
-  return response.json() as Promise<T>;
 }
 
 export async function getManifest(gateway: string, cid: string): Promise<Manifest> {
@@ -115,18 +153,41 @@ export async function getManifest(gateway: string, cid: string): Promise<Manifes
   return manifest;
 }
 
+export function assertManifestMatchesRecord(manifest: Manifest, expected: { gitCommit: string; treeHash: string; diffCID: string; branchHash?: Hex }): void {
+  if (manifest.gitCommit.toLowerCase() !== expected.gitCommit.toLowerCase()) {
+    throw new Error(`Manifest commit mismatch: got ${manifest.gitCommit}, expected ${expected.gitCommit}`);
+  }
+  if (manifest.treeHash.toLowerCase() !== expected.treeHash.toLowerCase()) {
+    throw new Error(`Manifest tree mismatch for ${expected.gitCommit}`);
+  }
+  if (manifest.diffCID !== expected.diffCID) {
+    throw new Error(`Manifest diff CID mismatch for ${expected.gitCommit}`);
+  }
+  if (expected.branchHash && keccak256(stringToBytes(manifest.branch)).toLowerCase() !== expected.branchHash.toLowerCase()) {
+    throw new Error(`Manifest branch mismatch for ${expected.gitCommit}`);
+  }
+}
+
 export async function uploadJsonToIPFS(apiURL: string, value: unknown): Promise<string> {
   const body = new FormData();
   body.append("file", new Blob([JSON.stringify(value)], { type: "application/json" }), "metadata.json");
 
   let response: Response;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 30_000);
   try {
-    response = await fetch(`${apiURL.replace(/\/$/, "")}/api/v0/add?pin=true`, { method: "POST", body });
+    response = await fetch(`${apiURL.replace(/\/$/, "")}/api/v0/add?pin=true`, {
+      method: "POST",
+      body,
+      signal: controller.signal,
+    });
   } catch (err) {
     throw new Error(`Local IPFS upload failed at ${apiURL}: ${errorMessage(err)}`);
+  } finally {
+    window.clearTimeout(timeout);
   }
 
-  const text = await response.text();
+  const text = await readLimitedText(response, 64 * 1024);
   if (!response.ok) {
     throw new Error(`Local IPFS upload failed (${response.status}): ${text.trim() || response.statusText}`);
   }
@@ -136,6 +197,28 @@ export async function uploadJsonToIPFS(apiURL: string, value: unknown): Promise<
   const result = JSON.parse(lastLine) as { Hash?: string };
   if (!result.Hash) throw new Error("Local IPFS add response did not include a CID.");
   return result.Hash;
+}
+
+async function readLimitedText(response: Response, maxBytes: number): Promise<string> {
+  const contentLength = Number(response.headers.get("content-length") ?? "0");
+  if (contentLength > maxBytes) throw new Error(`IPFS response exceeds ${maxBytes} bytes`);
+  if (!response.body) return response.text();
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let size = 0;
+  let text = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel();
+      throw new Error(`IPFS response exceeds ${maxBytes} bytes`);
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
 }
 
 export function cidV0FromDigest(digestHex: Hex): string {
@@ -170,11 +253,8 @@ export function formatUnix(value: bigint): string {
 
 export function formatChainId(chainId: string): string {
   if (!chainId) return "";
-  try {
-    return String(Number.parseInt(chainId, 16));
-  } catch {
-    return chainId;
-  }
+  const parsed = Number.parseInt(chainId, 16);
+  return Number.isNaN(parsed) ? chainId : String(parsed);
 }
 
 export function shortAddress(value: string): string {

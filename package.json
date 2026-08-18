@@ -4,6 +4,9 @@
   "scripts": {
     "anvil:seed": "node scripts/seed-anvil.mjs",
     "compile": "node scripts/compile-contract.mjs",
+    "format:check": "prettier --check web/src vite.config.ts scripts/compile-contract.mjs package.json .prettierrc.json",
+    "test:web": "vitest run",
+    "typecheck": "tsc --noEmit",
     "web:dev": "vite --host 0.0.0.0",
     "web:build": "vite build"
   },
@@ -11,13 +14,17 @@
     "@vitejs/plugin-react": "^5.2.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "solc": "^0.8.20",
     "typescript": "^5.9.3",
     "viem": "^2.52.2",
     "vite": "^7.3.5"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3"
+    "@types/react-dom": "^19.2.3",
+    "prettier": "^3.9.6",
+    "vitest": "^3.2.7"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1"
   }
 }
