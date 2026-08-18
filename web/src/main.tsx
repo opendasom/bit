@@ -1020,11 +1020,12 @@ function App() {
           </label>
           {walletAddress ? (
             <div className="headerChip headerWalletChip">
-              <span>MetaMask</span>
+              <span><i className="walletStatusDot" aria-hidden="true" />MetaMask</span>
               <strong className="mono">{walletSummary}</strong>
             </div>
           ) : (
-            <button type="button" className="ghostButton headerButton" onClick={connectWallet}>
+            <button type="button" className="headerButton" onClick={connectWallet}>
+              <span className="walletStatusDot" aria-hidden="true" />
               Connect MetaMask
             </button>
           )}
@@ -1150,7 +1151,6 @@ function App() {
               <div className="commandStudio">
                 <div className="studioTabs">
                   <div className="studioTab"><span className="fileDot" /> {workflowStep.fileName}</div>
-                  <div className="studioStatus"><i /> live example</div>
                 </div>
                 <div className="codeEditor mono">
                   <div className="editorLine"><span>1</span><code># {workflowStep.label.toLowerCase()} a Bit repository</code></div>
