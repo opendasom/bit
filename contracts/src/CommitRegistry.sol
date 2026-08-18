@@ -40,6 +40,7 @@ abstract contract CommitRegistry is RepoRegistry {
             }
         }
 
+        _registerBranch(repo, branch);
         bytes20 oldCommit = repo.branchCommits[branch];
         bytes memory oldHead = oldCommit == bytes20(0) ? bytes("") : abi.encodePacked(repo.commits[oldCommit].manifestDigest);
         bytes memory previousCommit = parents.length == 0 ? bytes("") : abi.encodePacked(parents[0]);
@@ -72,6 +73,44 @@ abstract contract CommitRegistry is RepoRegistry {
 
     function getBranchHistoryLength(uint256 repoId, bytes32 branch) external view repoExists(repoId) returns (uint256) {
         return repos[repoId].branchHistory[branch].length;
+    }
+
+    function getRepoBranchCount(uint256 repoId) external view repoExists(repoId) returns (uint256) {
+        return repos[repoId].branchKeys.length;
+    }
+
+    function getRepoBranches(uint256 repoId, uint256 start, uint256 limit)
+        external
+        view
+        repoExists(repoId)
+        returns (
+            bytes32[] memory branchKeys,
+            bytes20[] memory headCommits,
+            uint256[] memory historyLengths,
+            bytes32[] memory headManifestDigests
+        )
+    {
+        Repo storage repo = repos[repoId];
+        uint256 total = repo.branchKeys.length;
+        if (start >= total || limit == 0) {
+            return (new bytes32[](0), new bytes20[](0), new uint256[](0), new bytes32[](0));
+        }
+
+        uint256 count = total - start;
+        if (count > limit) count = limit;
+        branchKeys = new bytes32[](count);
+        headCommits = new bytes20[](count);
+        historyLengths = new uint256[](count);
+        headManifestDigests = new bytes32[](count);
+
+        for (uint256 i = 0; i < count; i++) {
+            bytes32 branch = repo.branchKeys[start + i];
+            bytes20 headCommit = repo.branchCommits[branch];
+            branchKeys[i] = branch;
+            headCommits[i] = headCommit;
+            historyLengths[i] = repo.branchHistory[branch].length;
+            headManifestDigests[i] = repo.commits[headCommit].manifestDigest;
+        }
     }
 
     function getBranchCommitAt(uint256 repoId, bytes32 branch, uint256 index)
@@ -214,6 +253,12 @@ abstract contract CommitRegistry is RepoRegistry {
         for (uint256 i = 0; i < source.parents.length; i++) {
             target.parents.push(source.parents[i]);
         }
+    }
+
+    function _registerBranch(Repo storage repo, bytes32 branch) internal {
+        if (repo.branchExists[branch]) return;
+        repo.branchExists[branch] = true;
+        repo.branchKeys.push(branch);
     }
 
     function _parentsToMemory(CommitRecord storage item) internal view returns (bytes20[] memory parents) {

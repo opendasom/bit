@@ -65,6 +65,15 @@ forge create --broadcast \
 # 출력의 "Deployed to: 0x..." 주소를 --contract 플래그에 사용
 ```
 
+빈 기본 Anvil 인스턴스의 첫 배포 주소는 `0x5FbDB2315678afecb367f032d93F642f64180aa3`입니다.
+로컬 IPFS 데몬과 새 BitRegistry가 실행 중일 때 데모 저장소, 브랜치, 커밋, PR 상태를 추가할 수 있습니다.
+
+```bash
+npm run anvil:seed
+```
+
+시드 명령은 기본 Anvil 계정 4개를 사용하며 비어 있는 registry에서 한 번만 실행합니다.
+
 ---
 
 ## 빠른 시작
@@ -153,7 +162,8 @@ npm run web:dev
 - Branch: 기본값 `main`
 
 웹은 공개 설정값을 코드에 하드코딩합니다. private key는 넣지 않습니다.
-웹은 IPFS API를 사용하지 않고, 읽기용 gateway만 사용합니다.
+웹은 대부분의 데이터를 읽기용 gateway에서 가져옵니다. Fork 이름을 변경하면 새 repository metadata를 로컬 IPFS API에 업로드하며,
+개발 서버는 `/ipfs-api`를 `http://127.0.0.1:5001`로 프록시합니다.
 체인에 쓰는 트랜잭션(PR 생성/승인/거부/닫기)은 MetaMask로 서명합니다.
 
 웹 화면은 커밋 메시지, 작성자, 작성일, 온체인 기록자, 온체인 기록 시간, 부모 커밋만 표시합니다. diff 내용은 표시하지 않습니다.

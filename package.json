@@ -2,6 +2,7 @@
   "name": "bit",
   "type": "module",
   "scripts": {
+    "anvil:seed": "node scripts/seed-anvil.mjs",
     "compile": "node scripts/compile-contract.mjs",
     "web:dev": "vite --host 0.0.0.0",
     "web:build": "vite build"

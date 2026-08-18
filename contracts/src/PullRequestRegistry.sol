@@ -8,6 +8,7 @@ abstract contract PullRequestRegistry is CommitRegistry {
     uint256 public nextPullRequestId = 1;
     mapping(uint256 => PullRequest) private pullRequests;
     mapping(uint256 => uint256[]) private repoPullRequests;
+    mapping(uint256 => uint256[]) private sourceRepoPullRequests;
 
     uint256 public constant MAX_PR_DESCRIPTION_LENGTH = 2048;
 
@@ -44,6 +45,7 @@ abstract contract PullRequestRegistry is CommitRegistry {
             description: description
         });
         repoPullRequests[targetRepoId].push(prId);
+        sourceRepoPullRequests[sourceRepoId].push(prId);
 
         emit PullRequestCreated(
             prId,
@@ -70,6 +72,7 @@ abstract contract PullRequestRegistry is CommitRegistry {
         (uint256 start, uint256 end) =
             _getPullRequestCommitRange(sourceRepo, pr.sourceBranch, pr.baseCommit, pr.sourceHeadCommit);
 
+        _registerBranch(targetRepo, pr.targetBranch);
         bytes20 currentHead = oldHead;
         bytes20 newHead = oldHead;
         bytes20[] storage sourceHistory = sourceRepo.branchHistory[pr.sourceBranch];
@@ -149,10 +152,55 @@ abstract contract PullRequestRegistry is CommitRegistry {
         return repoPullRequests[repoId][index];
     }
 
+    function getRepoPullRequestIds(uint256 repoId, uint256 start, uint256 limit)
+        external
+        view
+        repoExists(repoId)
+        returns (uint256[] memory)
+    {
+        return _slicePullRequestIds(repoPullRequests[repoId], start, limit);
+    }
+
+    function getSourceRepoPullRequestCount(uint256 repoId) external view repoExists(repoId) returns (uint256) {
+        return sourceRepoPullRequests[repoId].length;
+    }
+
+    function getSourceRepoPullRequestAt(uint256 repoId, uint256 index)
+        external
+        view
+        repoExists(repoId)
+        returns (uint256)
+    {
+        return sourceRepoPullRequests[repoId][index];
+    }
+
+    function getSourceRepoPullRequestIds(uint256 repoId, uint256 start, uint256 limit)
+        external
+        view
+        repoExists(repoId)
+        returns (uint256[] memory)
+    {
+        return _slicePullRequestIds(sourceRepoPullRequests[repoId], start, limit);
+    }
+
     function _requireOpenPullRequest(uint256 prId) private view returns (PullRequest storage pr) {
         pr = pullRequests[prId];
         if (pr.status == PullRequestStatus.None) revert PullRequestNotFound();
         if (pr.status != PullRequestStatus.Open) revert PullRequestNotOpen();
+    }
+
+    function _slicePullRequestIds(uint256[] storage values, uint256 start, uint256 limit)
+        private
+        view
+        returns (uint256[] memory ids)
+    {
+        if (start >= values.length || limit == 0) return new uint256[](0);
+        uint256 count = values.length - start;
+        if (count > limit) count = limit;
+        ids = new uint256[](count);
+        for (uint256 i = 0; i < count; i++) {
+            ids[i] = values[start + i];
+        }
     }
 
     /// @dev Half-open range [start, end) of source branch history to fast-forward onto the target.

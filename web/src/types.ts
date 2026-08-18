@@ -85,15 +85,7 @@ export type EthereumProvider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 };
 
-export type PullRequestCreatedLog = {
-  args: { prId?: bigint | null; sourceRepoId?: bigint | null };
-};
-
-export type CommitRecordedLog = {
-  args: { commitHash?: Hex; manifestDigest?: Hex };
-};
-
-export type PageState = "home" | "project";
+export type PageState = "home" | "project" | "fork";
 
 declare global {
   interface Window {

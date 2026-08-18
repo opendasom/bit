@@ -10,6 +10,11 @@ export function routeFromLocation(
   pathname: string,
   search: string,
 ): { page: PageState; repoId: bigint | null; branch: string | null; prId: bigint | null } {
+  const forkMatch = pathname.match(/^\/projects\/(\d+)\/fork\/?$/);
+  if (forkMatch) {
+    const params = new URLSearchParams(search);
+    return { page: "fork", repoId: BigInt(forkMatch[1]), branch: params.get("branch"), prId: null };
+  }
   const prMatch = pathname.match(/^\/projects\/(\d+)\/prs\/(\d+)\/?$/);
   if (prMatch) {
     const params = new URLSearchParams(search);
@@ -108,6 +113,29 @@ export async function getManifest(gateway: string, cid: string): Promise<Manifes
   const manifest = await fetchJson<Manifest>(ipfsURL(gateway, cid));
   manifestCache.set(cacheKey, manifest);
   return manifest;
+}
+
+export async function uploadJsonToIPFS(apiURL: string, value: unknown): Promise<string> {
+  const body = new FormData();
+  body.append("file", new Blob([JSON.stringify(value)], { type: "application/json" }), "metadata.json");
+
+  let response: Response;
+  try {
+    response = await fetch(`${apiURL.replace(/\/$/, "")}/api/v0/add?pin=true`, { method: "POST", body });
+  } catch (err) {
+    throw new Error(`Local IPFS upload failed at ${apiURL}: ${errorMessage(err)}`);
+  }
+
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`Local IPFS upload failed (${response.status}): ${text.trim() || response.statusText}`);
+  }
+
+  const lastLine = text.trim().split("\n").filter(Boolean).at(-1);
+  if (!lastLine) throw new Error("Local IPFS returned an empty add response.");
+  const result = JSON.parse(lastLine) as { Hash?: string };
+  if (!result.Hash) throw new Error("Local IPFS add response did not include a CID.");
+  return result.Hash;
 }
 
 export function cidV0FromDigest(digestHex: Hex): string {
