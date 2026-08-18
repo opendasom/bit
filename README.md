@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="public/bit-logo.png" alt="Bit logo" width="300" />
+</p>
+
 # Bit
 
 IPFS와 이더리움 위에서 동작하는 실험적 분산 버전 관리 프로토콜입니다. 커밋 diff와 메타데이터는 IPFS에, 브랜치·커밋 상태는 `BitRegistry` 스마트 컨트랙트에 저장합니다.
