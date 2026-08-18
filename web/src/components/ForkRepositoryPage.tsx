@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { MAX_REPOSITORY_NAME_LENGTH } from "../constants";
 import type { RepoSummary } from "../types";
 import { shortAddress } from "../utils";
 
@@ -7,25 +8,16 @@ type ForkRepositoryPageProps = {
   branch: string;
   commitCount: number | null;
   loading: boolean;
-  progress: { copied: number; total: number } | null;
   walletAddress: string;
   onCancel: () => void;
   onSubmit: (name: string) => void;
 };
 
-export function ForkRepositoryPage({
-  sourceRepo,
-  branch,
-  commitCount,
-  loading,
-  progress,
-  walletAddress,
-  onCancel,
-  onSubmit,
-}: ForkRepositoryPageProps) {
+export function ForkRepositoryPage({ sourceRepo, branch, commitCount, loading, walletAddress, onCancel, onSubmit }: ForkRepositoryPageProps) {
   const sourceName = sourceRepo.metadata?.name || `Repo #${sourceRepo.id.toString()}`;
   const [name, setName] = useState(sourceName);
   const trimmedName = name.trim();
+  const exceedsCommitLimit = commitCount !== null && commitCount > 64;
 
   useEffect(() => {
     setName(sourceName);
@@ -33,16 +25,11 @@ export function ForkRepositoryPage({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!trimmedName || loading) return;
+    if (!trimmedName || trimmedName.length > MAX_REPOSITORY_NAME_LENGTH || loading || exceedsCommitLimit) return;
     onSubmit(trimmedName);
   }
 
-  const transactionCount = commitCount === null ? null : commitCount + 1;
-  const actionLabel = progress
-    ? `Copying commits ${progress.copied}/${progress.total}`
-    : loading
-      ? "Preparing fork…"
-      : "Create fork";
+  const actionLabel = loading ? "Creating fork…" : "Create fork";
 
   return (
     <section className="forkPage">
@@ -67,13 +54,16 @@ export function ForkRepositoryPage({
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="Repository name"
+              maxLength={MAX_REPOSITORY_NAME_LENGTH}
               autoFocus
               disabled={loading}
               aria-describedby="fork-name-help"
             />
           </label>
           <p id="fork-name-help" className="helperText">
-            The description is copied from the source. The selected branch becomes the fork's default branch.
+            {exceedsCommitLimit
+              ? "Atomic forks currently support up to 64 commits. Shorten the branch before forking."
+              : "The description is copied from the source. The selected branch becomes the fork's default branch."}
           </p>
 
           <div className="forkSummaryGrid">
@@ -100,22 +90,24 @@ export function ForkRepositoryPage({
           <div>
             <div className="eyebrow">Review</div>
             <h3>{trimmedName || "Unnamed repository"}</h3>
-            <p>
-              Metadata will be uploaded once to local IPFS, then the repository and each commit will be written on-chain.
-            </p>
+            <p>Metadata is uploaded to local IPFS, then the bounded branch snapshot is copied in one atomic transaction.</p>
           </div>
 
           <div className="forkTransactionNote">
             <span>Wallet confirmations</span>
-            <strong>{transactionCount ?? "Calculating…"}</strong>
-            <small>One repository transaction plus one transaction per commit.</small>
+            <strong>1</strong>
+            <small>One atomic transaction creates the repository and copies its branch history.</small>
           </div>
 
           <div className="forkFormActions">
             <button type="button" className="ghostButton" onClick={onCancel} disabled={loading}>
               Cancel
             </button>
-            <button type="submit" className="primaryButton" disabled={!trimmedName || loading || commitCount === null}>
+            <button
+              type="submit"
+              className="primaryButton"
+              disabled={!trimmedName || trimmedName.length > MAX_REPOSITORY_NAME_LENGTH || loading || commitCount === null || exceedsCommitLimit}
+            >
               {actionLabel}
             </button>
           </div>

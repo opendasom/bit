@@ -15,14 +15,18 @@ import (
 // Client는 IPFS HTTP API와 통신하는 클라이언트다.
 // apiURL: IPFS 노드 주소 (기본값: "http://localhost:5001")
 type Client struct {
-	apiURL string
-	http   *http.Client
+	apiURL          string
+	http            *http.Client
+	maxDownloadSize int64
 }
+
+const MaxDownloadBytes int64 = 64 << 20
 
 // NewClient는 IPFS 클라이언트를 생성한다.
 func NewClient(apiURL string) *Client {
 	return &Client{
-		apiURL: strings.TrimRight(apiURL, "/"),
+		apiURL:          strings.TrimRight(apiURL, "/"),
+		maxDownloadSize: MaxDownloadBytes,
 		http: &http.Client{
 			Timeout: 2 * time.Minute,
 		},
@@ -43,7 +47,9 @@ func (c *Client) Upload(data []byte) (string, error) {
 	if _, err := part.Write(data); err != nil {
 		return "", err
 	}
-	writer.Close()
+	if err := writer.Close(); err != nil {
+		return "", err
+	}
 
 	resp, err := c.http.Post(
 		c.apiURL+"/api/v0/add",
@@ -59,11 +65,19 @@ func (c *Client) Upload(data []byte) (string, error) {
 		return "", fmt.Errorf("ipfs add failed: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(data)))
 	}
 
+	responseData, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024+1))
+	if err != nil {
+		return "", err
+	}
+	if len(responseData) > 64*1024 {
+		return "", fmt.Errorf("ipfs add response exceeds maximum size of %d bytes", 64*1024)
+	}
+
 	// 응답 JSON에서 CID(Hash 필드) 추출
 	var result struct {
 		Hash string `json:"Hash"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(responseData, &result); err != nil {
 		return "", err
 	}
 	if result.Hash == "" {
@@ -89,5 +103,12 @@ func (c *Client) Download(cid string) ([]byte, error) {
 		return nil, fmt.Errorf("ipfs cat failed: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(data)))
 	}
 
-	return io.ReadAll(resp.Body)
+	data, err := io.ReadAll(io.LimitReader(resp.Body, c.maxDownloadSize+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > c.maxDownloadSize {
+		return nil, fmt.Errorf("ipfs object exceeds maximum size of %d bytes", c.maxDownloadSize)
+	}
+	return data, nil
 }

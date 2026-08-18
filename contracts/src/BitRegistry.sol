@@ -5,4 +5,6 @@ import {PullRequestRegistry} from "./PullRequestRegistry.sol";
 
 /// @notice On-chain git registry. Behaviour lives in the role-specific bases:
 /// RepoRegistry (repos + roles) -> CommitRegistry (commits, branches, tags) -> PullRequestRegistry (PRs).
-contract BitRegistry is PullRequestRegistry {}
+contract BitRegistry is PullRequestRegistry {
+    uint256 public constant PROTOCOL_VERSION = 2;
+}

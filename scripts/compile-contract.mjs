@@ -1,51 +1,75 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
-import solc from "solc";
+import { spawnSync } from "node:child_process";
 
 const root = process.cwd();
-const srcDir = path.join(root, "contracts/src");
-const outDir = path.join(root, "internal/chain/artifacts");
-const outPath = path.join(outDir, "BitRegistry.json");
+const candidates = [process.env.FOUNDRY_FORGE, "forge", path.join(os.homedir(), ".foundry", "bin", "forge")].filter(Boolean);
 
-const sources = Object.fromEntries(
-  fs
-    .readdirSync(srcDir)
-    .filter((name) => name.endsWith(".sol"))
-    .map((name) => [name, { content: fs.readFileSync(path.join(srcDir, name), "utf8") }])
-);
-
-const input = {
-  language: "Solidity",
-  sources,
-  settings: {
-    evmVersion: "paris",
-    viaIR: true,
-    optimizer: { enabled: true, runs: 200 },
-    outputSelection: {
-      "*": {
-        "*": ["abi", "evm.bytecode.object"]
-      }
-    }
+let buildError = "forge executable was not found";
+let built = false;
+for (const executable of candidates) {
+  const result = spawnSync(executable, ["build"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  if (result.status === 0) {
+    built = true;
+    break;
   }
-};
-
-const output = JSON.parse(solc.compile(JSON.stringify(input)));
-const errors = output.errors ?? [];
-const fatal = errors.filter((err) => err.severity === "error");
-for (const err of errors) {
-  console.error(err.formattedMessage);
+  buildError = [result.error?.message, result.stdout, result.stderr].filter(Boolean).join("\n").trim();
 }
-if (fatal.length > 0) {
-  process.exit(1);
+if (!built) {
+  throw new Error(`Foundry build failed. Install Foundry or set FOUNDRY_FORGE.\n${buildError}`);
 }
 
-const contract = output.contracts["BitRegistry.sol"].BitRegistry;
+const foundryPath = path.join(root, "out", "BitRegistry.sol", "BitRegistry.json");
+const outputPath = path.join(root, "internal", "chain", "artifacts", "BitRegistry.json");
+const foundryArtifact = JSON.parse(fs.readFileSync(foundryPath, "utf8"));
+const abiTypeOrder = new Map([
+  ["error", 0],
+  ["event", 1],
+  ["function", 2],
+  ["constructor", 3],
+]);
+const abi = [...foundryArtifact.abi].sort((left, right) => {
+  const typeOrder = (abiTypeOrder.get(left.type) ?? 99) - (abiTypeOrder.get(right.type) ?? 99);
+  return typeOrder || (left.name ?? "").localeCompare(right.name ?? "");
+});
+function normalizeParameter(parameter) {
+  const normalized = {};
+  if (parameter.indexed !== undefined) normalized.indexed = parameter.indexed;
+  if (parameter.components) normalized.components = parameter.components.map(normalizeParameter);
+  if (parameter.internalType !== undefined) normalized.internalType = parameter.internalType;
+  if (parameter.name !== undefined) normalized.name = parameter.name;
+  if (parameter.type !== undefined) normalized.type = parameter.type;
+  return normalized;
+}
+
+function normalizeABIEntry(entry) {
+  if (entry.type === "error") {
+    return { inputs: entry.inputs.map(normalizeParameter), name: entry.name, type: entry.type };
+  }
+  if (entry.type === "event") {
+    return { anonymous: entry.anonymous, inputs: entry.inputs.map(normalizeParameter), name: entry.name, type: entry.type };
+  }
+  if (entry.type === "function") {
+    return {
+      inputs: entry.inputs.map(normalizeParameter),
+      name: entry.name,
+      outputs: entry.outputs.map(normalizeParameter),
+      stateMutability: entry.stateMutability,
+      type: entry.type,
+    };
+  }
+  return entry;
+}
 const artifact = {
   contractName: "BitRegistry",
-  abi: contract.abi,
-  bytecode: `0x${contract.evm.bytecode.object}`
+  abi: abi.map(normalizeABIEntry),
+  bytecode: foundryArtifact.bytecode.object,
 };
 
-fs.mkdirSync(outDir, { recursive: true });
-fs.writeFileSync(outPath, `${JSON.stringify(artifact, null, 2)}\n`);
-console.log(outPath);
+fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+fs.writeFileSync(outputPath, `${JSON.stringify(artifact, null, 2)}\n`);
+console.log(outputPath);

@@ -42,7 +42,9 @@ export function PrDetailView(props: PrDetailViewProps) {
         <div>
           <div className="prDetailTitleRow">
             <span className={`statusChip ${prStatusChipClass(pr.status)}`}>{prStatusLabel(pr.status)}</span>
-            <h3 className="prDetailTitle">#{pr.id.toString()} · {titleLine}</h3>
+            <h3 className="prDetailTitle">
+              #{pr.id.toString()} · {titleLine}
+            </h3>
           </div>
           <div className="prDetailAuthor">
             <span className="mono">{shortAddress(pr.author)}</span>
@@ -123,11 +125,11 @@ export function PrDetailView(props: PrDetailViewProps) {
             <div className="timelineMark" />
             <div className="timelineBody">
               <div className="timelineTop">
-                <h4>{commit.message || "(no message)"}</h4>
+                <h4 title={commit.metadataError}>{commit.metadataError ? "Commit metadata unavailable" : commit.message || "(no message)"}</h4>
                 <span className="mono commitHash">{shortHex(commit.hash)}</span>
               </div>
               <div className="timelineMeta">
-                <span>{commit.authorName || "Unknown author"}</span>
+                <span>{commit.metadataError ? "IPFS unavailable" : commit.authorName || "Unknown author"}</span>
                 <span>{formatDate(commit.authorDate)}</span>
               </div>
             </div>

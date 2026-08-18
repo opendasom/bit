@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -62,6 +63,12 @@ type Client struct {
 	conn            *ethclient.Client
 }
 
+const (
+	callTimeout             = 30 * time.Second
+	transactionTimeout      = 5 * time.Minute
+	expectedProtocolVersion = 2
+)
+
 func loadArtifactABI() (abi.ABI, error) {
 	artifactOnce.Do(func() {
 		var artifact artifactJSON
@@ -76,7 +83,7 @@ func loadArtifactABI() (abi.ABI, error) {
 
 // NewClient는 RPC 노드에 연결하고 개인키로 지갑을 초기화해 Client를 반환한다.
 func NewClient(rpcURL, contractAddress, privateKeyHex string) (*Client, error) {
-	conn, err := ethclient.Dial(rpcURL)
+	client, err := newClient(rpcURL, contractAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -84,30 +91,79 @@ func NewClient(rpcURL, contractAddress, privateKeyHex string) (*Client, error) {
 	privateKeyHex = strings.TrimPrefix(privateKeyHex, "0x")
 	privKey, err := crypto.HexToECDSA(privateKeyHex)
 	if err != nil {
+		client.Close()
 		return nil, err
 	}
 
-	chainID, err := conn.ChainID(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+	defer cancel()
+	chainID, err := client.conn.ChainID(ctx)
 	if err != nil {
+		client.Close()
 		return nil, err
 	}
 
 	auth, err := bind.NewKeyedTransactorWithChainID(privKey, chainID)
 	if err != nil {
+		client.Close()
 		return nil, err
 	}
+	client.auth = auth
+	return client, nil
+}
 
+func NewReadOnlyClient(rpcURL, contractAddress string) (*Client, error) {
+	return newClient(rpcURL, contractAddress)
+}
+
+func newClient(rpcURL, contractAddress string) (*Client, error) {
 	if !common.IsHexAddress(contractAddress) {
 		return nil, fmt.Errorf("invalid contract address: %s", contractAddress)
 	}
-	parsedABI, err := loadArtifactABI()
+	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+	defer cancel()
+	conn, err := ethclient.DialContext(ctx, rpcURL)
 	if err != nil {
 		return nil, err
 	}
+	parsedABI, err := loadArtifactABI()
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
 	address := common.HexToAddress(contractAddress)
+	code, err := conn.CodeAt(ctx, address, nil)
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("contract bytecode check failed: %w", err)
+	}
+	if len(code) == 0 {
+		conn.Close()
+		return nil, fmt.Errorf("no contract deployed at %s", address.Hex())
+	}
 	contract := bind.NewBoundContract(address, parsedABI, conn, conn, conn)
+	var versionResult []interface{}
+	if err := contract.Call(&bind.CallOpts{Context: ctx}, &versionResult, "PROTOCOL_VERSION"); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("contract protocol version check failed: %w", err)
+	}
+	if len(versionResult) != 1 {
+		conn.Close()
+		return nil, fmt.Errorf("contract protocol version returned %d values; expected 1", len(versionResult))
+	}
+	version := *abi.ConvertType(versionResult[0], new(*big.Int)).(**big.Int)
+	if !version.IsInt64() || version.Int64() != expectedProtocolVersion {
+		conn.Close()
+		return nil, fmt.Errorf("unsupported contract protocol version %s; expected %d", version, expectedProtocolVersion)
+	}
 
-	return &Client{contractAddress: address, contract: contract, auth: auth, conn: conn}, nil
+	return &Client{contractAddress: address, contract: contract, conn: conn}, nil
+}
+
+func (c *Client) Close() {
+	if c != nil && c.conn != nil {
+		c.conn.Close()
+	}
 }
 
 // branchNameToBytes32는 브랜치명 문자열을 keccak256 해시한 [32]byte로 변환한다.
@@ -142,15 +198,19 @@ func IsZeroBytes20(hash [20]byte) bool {
 }
 
 func (c *Client) call(method string, params ...interface{}) ([]interface{}, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+	defer cancel()
 	var out []interface{}
-	if err := c.contract.Call(&bind.CallOpts{Context: context.Background()}, &out, method, params...); err != nil {
+	if err := c.contract.Call(&bind.CallOpts{Context: ctx}, &out, method, params...); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
 func (c *Client) waitSuccessful(tx *types.Transaction) (*types.Receipt, error) {
-	receipt, err := bind.WaitMined(context.Background(), c.conn, tx)
+	ctx, cancel := context.WithTimeout(context.Background(), transactionTimeout)
+	defer cancel()
+	receipt, err := bind.WaitMined(ctx, c.conn, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -158,6 +218,17 @@ func (c *Client) waitSuccessful(tx *types.Transaction) (*types.Receipt, error) {
 		return nil, fmt.Errorf("transaction reverted: %s", tx.Hash().Hex())
 	}
 	return receipt, nil
+}
+
+func (c *Client) transact(method string, params ...interface{}) (*types.Transaction, error) {
+	if c.auth == nil {
+		return nil, errors.New("transaction signer is not configured")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+	defer cancel()
+	auth := *c.auth
+	auth.Context = ctx
+	return c.contract.Transact(&auth, method, params...)
 }
 
 // GetBranchHead는 특정 브랜치의 현재 헤드 manifest CID를 체인에서 조회한다.
@@ -219,10 +290,22 @@ func (c *Client) GetBranchCommitsWithMetadata(repoID *big.Int, branch string, st
 	if err != nil {
 		return nil, err
 	}
+	if len(out) != 4 {
+		return nil, fmt.Errorf("malformed branch page: returned %d values; expected 4", len(out))
+	}
 	commitHashes := *abi.ConvertType(out[0], new([][20]byte)).(*[][20]byte)
 	treeHashes := *abi.ConvertType(out[1], new([][20]byte)).(*[][20]byte)
 	manifestDigests := *abi.ConvertType(out[2], new([][32]byte)).(*[][32]byte)
 	diffDigests := *abi.ConvertType(out[3], new([][32]byte)).(*[][32]byte)
+	if len(treeHashes) != len(commitHashes) || len(manifestDigests) != len(commitHashes) || len(diffDigests) != len(commitHashes) {
+		return nil, fmt.Errorf(
+			"malformed branch page: commits=%d trees=%d manifests=%d diffs=%d",
+			len(commitHashes),
+			len(treeHashes),
+			len(manifestDigests),
+			len(diffDigests),
+		)
+	}
 	records := make([]BranchCommitRecord, len(commitHashes))
 	for i := range commitHashes {
 		records[i] = BranchCommitRecord{
@@ -259,8 +342,7 @@ func (c *Client) RecordCommit(
 	manifestDigest [32]byte,
 	diffDigest [32]byte,
 ) error {
-	tx, err := c.contract.Transact(
-		c.auth,
+	tx, err := c.transact(
 		"recordCommit",
 		repoID,
 		branchNameToBytes32(branch),
@@ -280,7 +362,7 @@ func (c *Client) RecordCommit(
 
 // CreateRepo는 체인에 새 저장소를 생성하고 repoId를 반환한다.
 func (c *Client) CreateRepo(metadataCID string) (*big.Int, error) {
-	tx, err := c.contract.Transact(c.auth, "createRepo", []byte(metadataCID))
+	tx, err := c.transact("createRepo", []byte(metadataCID))
 	if err != nil {
 		return nil, err
 	}

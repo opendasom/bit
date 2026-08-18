@@ -27,12 +27,16 @@ var pullCmd = &cobra.Command{
 		if !ok {
 			return fmt.Errorf("remote '%s' 를 찾을 수 없습니다", remoteName)
 		}
+		if err := validateRemoteForConfig(remote, cfg); err != nil {
+			return err
+		}
 		repoID := new(big.Int).SetUint64(remote.RepoID)
 
-		chainClient, err := chain.NewClient(cfg.RPCURL, cfg.ContractAddress, cfg.PrivateKey)
+		chainClient, err := chain.NewReadOnlyClient(cfg.RPCURL, cfg.ContractAddress)
 		if err != nil {
 			return fmt.Errorf("체인 연결 실패: %w", err)
 		}
+		defer chainClient.Close()
 		ipfsClient := ipfs.NewClient(cfg.IPFSURL)
 
 		return app.Pull(chainClient, ipfsClient, ".", repoID, branch)
