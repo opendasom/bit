@@ -1,3 +1,7 @@
+<p align="right">
+  <strong>English</strong> · <a href="README.ko.md">한국어</a>
+</p>
+
 <p align="center">
   <img src="docs/assets/bit-logo-readme.png" alt="Bit logo" width="300" />
 </p>
@@ -16,30 +20,30 @@
 </p>
 
 <p align="center">
-  <a href="#빠른-시작">Quick start</a> ·
-  <a href="#데모">Demos</a> ·
-  <a href="#명령어-참조">CLI reference</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#demos">Demos</a> ·
+  <a href="#cli-reference">CLI reference</a> ·
   <a href="CONTRIBUTING.md">Contributing</a> ·
   <a href="SECURITY.md">Security</a>
 </p>
 
-IPFS와 이더리움 위에서 동작하는 실험적 분산 버전 관리 프로토콜입니다. 커밋 diff와 메타데이터는 IPFS에, 브랜치·커밋 상태는 `BitRegistry` 스마트 컨트랙트에 저장합니다.
+Bit is an experimental distributed version-control protocol built on IPFS and Ethereum. Commit diffs and metadata are stored on IPFS, while branch and commit state are recorded by the `BitRegistry` smart contract.
 
 > [!WARNING]
-> **Alpha software.** 프로토콜과 저장 형식은 변경될 수 있으며, 프로덕션 사용이나 실제 자산이 걸린 환경을 위한 보안 감사를 받지 않았습니다.
+> **Alpha software.** The protocol and storage formats may change. Bit has not received a security audit for production use or environments involving assets of real value.
 
-중앙 Git 서버 없이 코드 히스토리를 content-addressed 형태로 저장하고 누구나 검증할 수 있습니다. 온체인 레코드는 히스토리의 무결성을 검증할 수 있게 하지만, IPFS 데이터의 가용성은 핀(pin)과 복제 상태에 달려 있습니다. 중요한 데이터는 자체 IPFS 노드 또는 신뢰할 수 있는 pinning 서비스에 보관하세요.
+Bit stores source history in a content-addressed form without relying on a central Git server, allowing anyone to verify it. On-chain records protect history integrity, but IPFS availability depends on pinning and replication. Preserve important data on your own IPFS node or a trusted pinning service.
 
-## 핵심 구성
+## Architecture
 
-| 계층 | Bit가 하는 일 |
+| Layer | Responsibility |
 |---|---|
-| **Git client** | 익숙한 Git 저장소와 커밋을 로컬에서 생성하고, `bit` CLI로 원격 상태와 동기화합니다. |
-| **IPFS** | diff, manifest, repository metadata를 content-addressed 객체로 저장하고 복제합니다. |
-| **Ethereum** | `BitRegistry`가 repository·branch head·commit CID·역할을 기록해 상태와 권한을 검증합니다. |
-| **Web explorer** | [`bit-w3`](https://github.com/opendasom/bit-w3)에서 IPFS와 체인 상태를 읽고, MetaMask 서명으로 fork·역할·PR 작업을 수행합니다. |
+| **Git client** | Create familiar Git repositories and commits locally, then synchronize remote state with the `bit` CLI. |
+| **IPFS** | Store and replicate diffs, manifests, and repository metadata as content-addressed objects. |
+| **Ethereum** | Record repository state, branch heads, commit CIDs, and roles in `BitRegistry`. |
+| **Web explorer** | Use [`bit-w3`](https://github.com/opendasom/bit-w3) to inspect IPFS and chain state and sign fork, role, and pull-request operations with MetaMask. |
 
-## 데모
+## Demos
 
 <table>
   <tr>
@@ -58,70 +62,66 @@ IPFS와 이더리움 위에서 동작하는 실험적 분산 버전 관리 프�
   </tr>
 </table>
 
-## 설치
+## Installation
 
-**사전 조건**
+Prerequisites:
 
-- Go 1.25+ (`go.mod`의 toolchain 설정이 검증된 Go 버전을 선택합니다)
-- Foundry 1.7.1+ (`anvil`, `forge`) — 로컬 체인 및 컨트랙트 배포용 (선택)
-- Node.js 20.19+ — 컨트랙트 ABI 아티팩트 생성용 (선택)
-- IPFS 데몬 (Kubo) — `ipfs daemon`
-- 이더리움 노드 접근 (로컬: Anvil, 테스트넷: Sepolia 등)
+- Go 1.25+ (the `go.mod` toolchain directive selects the verified version)
+- An IPFS daemon such as Kubo (`ipfs daemon`)
+- Access to an Ethereum node, such as local Anvil or Sepolia
+- Foundry 1.7.1+ (`anvil`, `forge`) for local-chain and contract development (optional)
+- Node.js 20.19+ for generating the contract ABI artifact (optional)
 
 ```bash
 git clone https://github.com/opendasom/bit.git
 cd bit
 go build -o bit ./cmd/bit
 
-# 전역 명령어로 등록 (선택)
+# Optional: install as a global command.
 sudo cp ./bit /usr/local/bin/bit
 ```
 
----
+## Local test environment
 
-## 로컬 테스트 환경 구성
+Open three terminals and start each component in order.
 
-터미널 3개를 열어 순서대로 실행합니다.
+**Terminal 1 — start Anvil**
 
-**터미널 1 — Anvil 실행**
 ```bash
 anvil
-# 출력에서 private key 복사 (기본 첫 번째 키 사용)
+# Copy a private key from the output; the first default key is sufficient.
 ```
 
-**터미널 2 — IPFS 데몬 실행**
+**Terminal 2 — start IPFS**
+
 ```bash
 ipfs daemon
 ```
 
-**터미널 3 — 프로젝트 루트에서 컨트랙트 배포**
+**Terminal 3 — deploy the contract from the repository root**
+
 ```bash
 forge create --broadcast \
   --rpc-url http://127.0.0.1:8545 \
   --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
   contracts/src/BitRegistry.sol:BitRegistry
-# 출력의 "Deployed to: 0x..." 주소를 --contract 플래그에 사용
+# Use the "Deployed to: 0x..." address with the --contract flag.
 ```
 
-빈 기본 Anvil 인스턴스의 첫 배포 주소는 `0x5FbDB2315678afecb367f032d93F642f64180aa3`입니다.
-로컬 IPFS 데몬과 새 BitRegistry가 실행 중일 때 데모 저장소, 브랜치, 커밋, PR 상태를 추가할 수 있습니다.
+The first deployment address on a fresh default Anvil instance is `0x5FbDB2315678afecb367f032d93F642f64180aa3`. Once local IPFS and the new registry are running, seed demo repositories, branches, commits, and pull requests from the Web3 repository:
 
 ```bash
-# Web3 저장소에서 실행
 git clone --recurse-submodules https://github.com/opendasom/bit-w3.git
 cd bit-w3
 npm ci
 npm run anvil:seed
 ```
 
-시드 명령은 기본 Anvil 계정 4개를 사용하며 비어 있는 registry에서 한 번만 실행합니다.
-README에 나온 private key는 Anvil의 공개된 **로컬 테스트 전용** 키입니다. 어떤 테스트넷이나 메인넷에서도 사용하면 안 됩니다.
+The seed command uses four default Anvil accounts and must run against an empty registry. The private key above is a publicly known Anvil key for **local testing only**. Never use it on a testnet or mainnet.
 
----
+## Quick start
 
-## 빠른 시작
-
-### 1. 저장소 초기화
+### 1. Initialize a repository
 
 ```bash
 mkdir my-project && cd my-project
@@ -132,35 +132,35 @@ bit init \
   --rpc http://127.0.0.1:8545 \
   --contract 0xYourContractAddress \
   --name my-project
-# --ipfs 생략 시 기본값: http://localhost:5001
+# Default when --ipfs is omitted: http://localhost:5001
 ```
 
-쓰기 명령 전에는 개인키를 config나 shell history에 저장하지 않고 환경변수로 제공합니다.
+Provide the private key through an environment variable before write operations. Do not store it in configuration or shell history.
 
-성공하면 `.bit/config.json`이 생성되고 체인에 저장소가 등록됩니다 (repoId 발급).
+On success, Bit creates `.bit/config.json` and registers the repository on-chain, assigning it a `repoId`.
 
-### 2. remote 추가
+### 2. Add a remote
 
 ```bash
-# URL 형식: bit://<network>/<contractAddress>/<repoId>
+# URL format: bit://<network>/<contractAddress>/<repoId>
 bit remote add origin bit://local/0xYourContractAddress/1
 ```
 
-현재 CLI는 remote URL에서 `repoId`를 읽고, RPC URL과 컨트랙트 주소는 `bit init`으로 만든 `.bit/config.json`을 사용합니다. URL의 network·contract 값과 로컬 설정 값은 같은 배포 환경을 가리키도록 맞추세요.
+The CLI reads `repoId` from the remote URL and uses the RPC URL and contract address stored by `bit init` in `.bit/config.json`. Ensure the URL network and contract identify the same deployment as the local configuration.
 
-### 3. push
+### 3. Push
 
 ```bash
 git add . && git commit -m "first commit"
 bit push origin
-# 현재 브랜치를 자동 감지해서 push
+# The current branch is detected automatically.
 ```
 
-> merge commit push는 지원하지 않습니다 (linear history only).
+> Pushing merge commits is not supported; history must be linear.
 
-### 4. pull
+### 4. Pull and clone
 
-다른 머신이나 디렉토리에서 코드를 받을 때는 read-only `clone`을 사용합니다. 개인키나 새 on-chain repository 생성이 필요하지 않습니다.
+Use the read-only `clone` command to restore code on another machine or in another directory. It does not require a private key or create a new on-chain repository.
 
 ```bash
 bit clone bit://local/0xYourContractAddress/1 other-project \
@@ -169,29 +169,27 @@ bit clone bit://local/0xYourContractAddress/1 other-project \
   --branch main
 ```
 
-### 5. Fork 및 PR 생성/관리 (웹)
+### 5. Create and manage forks and pull requests
 
-웹 explorer에서 현재 브랜치를 새 온체인 저장소로 fork하거나 PR을 생성/승인/거부/닫을 수 있습니다.
+The Web3 explorer can fork the current branch into a new on-chain repository and create, approve, reject, or close pull requests.
 
-- **Fork `<branch>`** 버튼은 현재 브랜치의 온체인 커밋 히스토리와 IPFS CID 포인터를 하나의 atomic transaction으로 복제합니다.
-- fork와 PR은 한 작업당 최대 64개 커밋을 지원하여 block gas 초과를 방지합니다.
-- fork와 PR 생성/승인/거부/닫기는 모두 웹 explorer에서 MetaMask로 서명합니다.
+- **Fork `<branch>`** copies the branch's on-chain commit history and IPFS CID pointers in one atomic transaction.
+- Fork and pull-request operations support up to 64 commits per operation to limit block gas usage.
+- MetaMask signs all fork and pull-request state changes.
 
-1. 웹에서 원본 저장소와 브랜치를 선택하고 **Fork**를 실행합니다.
-2. 생성된 fork의 `bit://` URL을 사용해 `bit clone <fork-url> my-fork`로 로컬 작업 사본을 만듭니다.
-3. 로컬에서 새 커밋을 만들고 `BIT_PRIVATE_KEY=... bit push origin`으로 fork에 push합니다.
-4. 웹에서 fork의 **Pull Requests** 탭을 열고 대상 저장소/브랜치, 소스 브랜치, 설명을 입력합니다.
-5. 대상 저장소 Maintainer는 **Approve**(fast-forward 반영) / **Reject**할 수 있고, 작성자 또는 Maintainer는 **Close**할 수 있습니다.
+1. Select a source repository and branch in the explorer, then choose **Fork**.
+2. Clone the generated fork with `bit clone <fork-url> my-fork`.
+3. Commit locally and push with `BIT_PRIVATE_KEY=... bit push origin`.
+4. Open the fork's **Pull Requests** tab and enter the target repository, target branch, source branch, and description.
+5. A target-repository Maintainer can **Approve** or **Reject**. The author or a Maintainer can **Close** the request.
 
-- target 브랜치가 fork 시점 이후 먼저 앞서 나갔다면 생성이 거절됩니다.
-- 현재 브랜치에 새 커밋이 없으면 PR 생성이 거절됩니다.
-- 실제 반영은 `approve` 시점에 다시 검증됩니다.
+Creation is rejected if the target branch has advanced since the fork or if the source branch contains no new commits. Approval repeats the validation before applying a fast-forward update.
 
-> **주의**: indexed PR range와 atomic fork가 추가되어 ABI가 변경되었습니다. 기존 배포와 호환되지 않습니다. PR 설명은 체인에 저장됩니다. 새 BitRegistry를 배포했다면 `bit-w3`의 `.env.local`에서 `VITE_BIT_CONTRACT`를 새 주소로 변경하고 웹 개발 서버를 다시 시작하세요.
+> **Compatibility notice:** Indexed pull-request ranges and atomic forks changed the ABI and are incompatible with older deployments. Pull-request descriptions are stored on-chain. After deploying a new `BitRegistry`, update `VITE_BIT_CONTRACT` in `bit-w3/.env.local` and restart the development server.
 
-### 6. 웹 explorer
+### 6. Run the Web3 explorer
 
-웹 explorer는 독립된 [`opendasom/bit-w3`](https://github.com/opendasom/bit-w3) 저장소에서 관리합니다. 해당 저장소는 이 저장소를 `bit` submodule로 포함하여 CLI와 동일한 `BitRegistry` ABI를 사용합니다.
+The explorer is maintained in the independent [`opendasom/bit-w3`](https://github.com/opendasom/bit-w3) repository. It includes this repository as the `bit` submodule and consumes the same `BitRegistry` ABI as the CLI.
 
 ```bash
 git clone --recurse-submodules https://github.com/opendasom/bit-w3.git
@@ -201,90 +199,82 @@ cp .env.example .env.local
 npm run dev
 ```
 
-웹 관련 문서, 이슈, 보안 신고 및 기타 기여는 모두 이 `bit` 저장소에서 통합 관리합니다.
+Web documentation, issues, security reports, and all other contributions are coordinated through this `bit` repository.
 
----
-
-## 명령어 참조
+## CLI reference
 
 ### `bit init`
 
-```
+```text
 BIT_PRIVATE_KEY=<privkey> bit init --rpc <url> --contract <addr> [--ipfs <url>] [--name <repo-name>] [--description <text>] [--branch <branch>]
 ```
 
-- `.git`이 없으면 에러. 먼저 `git init` 필요.
-- 저장소 metadata를 IPFS에 업로드한 뒤 체인에 저장소를 생성하고 `.bit/config.json`을 저장합니다.
-- 개인키는 `.bit/config.json`에 저장하지 않으며 `.bit/`는 `.git/info/exclude`에 자동 등록됩니다.
-- `--key`는 하위 호환용 deprecated 옵션입니다. `BIT_PRIVATE_KEY` 환경변수를 사용하세요.
-- `--name` 생략 시 현재 디렉토리명이 웹 표시 이름으로 사용됩니다.
-- `--branch` 생략 시 `main`이 웹 기본 브랜치로 사용됩니다.
+- Requires an existing `.git` directory; run `git init` first.
+- Uploads repository metadata to IPFS, creates the on-chain repository, and writes `.bit/config.json`.
+- Never writes the private key to `.bit/config.json`; `.bit/` is automatically added to `.git/info/exclude`.
+- `--key` is deprecated and retained only for compatibility. Use `BIT_PRIVATE_KEY`.
+- Defaults the display name to the current directory name when `--name` is omitted.
+- Defaults the Web3 explorer branch to `main` when `--branch` is omitted.
 
 ### `bit remote add`
 
-```
+```text
 bit remote add <name> <url>
 ```
 
-- URL 형식: `bit://<network>/<contractAddress>/<repoId>`
+URL format: `bit://<network>/<contractAddress>/<repoId>`
 
 ### `bit push`
 
-```
+```text
 bit push <remote>
 ```
 
-- 현재 브랜치를 자동 감지합니다 (인자 없음).
-- 체인의 현재 헤드 이후 커밋들을 순서대로 push합니다.
-- 각 커밋마다 diff와 manifest를 IPFS에 업로드하고 체인에 기록합니다.
+- Detects the current branch automatically.
+- Pushes commits after the current on-chain head in order.
+- Uploads each commit's diff and manifest to IPFS before recording it on-chain.
 
 ### `bit pull`
 
-```
+```text
 bit pull <remote> <branch>
 ```
 
-- 로컬 HEAD가 원격 히스토리에 없으면 에러 (diverged).
-- 누락 커밋을 IPFS에서 받아 원본 커밋을 완전히 재구성합니다 (커밋 hash 보존).
-- 모든 manifest/diff/parent를 먼저 검증하고 Git object를 격리된 index에서 재구성한 뒤 branch를 한 번만 전환합니다.
-- dirty worktree에서는 실행을 거절합니다.
+- Rejects histories where local HEAD is absent from the remote history.
+- Downloads missing commits from IPFS and reproduces their original Git hashes.
+- Validates every manifest, diff, and parent before reconstructing Git objects in an isolated index, then updates the branch once.
+- Refuses to run with a dirty working tree.
 
 ### `bit clone`
 
-```
+```text
 bit clone <bit-url> [directory] --rpc <url> [--ipfs <url>] [--branch <branch>]
 ```
 
-- private key 없이 기존 repository를 복원합니다.
-- `origin` remote와 local config를 생성한 뒤 검증된 branch를 checkout합니다.
+- Restores an existing repository without a private key.
+- Creates the `origin` remote and local configuration before checking out the verified branch.
 
----
+## Authorization model
 
-## 권한 모델 (BitRegistry)
+| Role | Permissions |
+|---|---|
+| Owner | Assign roles through the explorer or `setRole`; the final Owner cannot be removed. |
+| Maintainer | Push with `recordCommit`, and approve or reject pull requests. |
+| Contributor | Explicit participant designation without write permission. |
+| None | Read-only access. |
 
-| Role | 권한 |
-|------|------|
-| Owner | 웹 또는 setRole로 다른 사용자 역할 지정; 마지막 Owner 제거는 금지 |
-| Maintainer | push(recordCommit), PR 승인/거부 (웹에서 처리) |
-| Contributor | 명시적 참여자 표시 (쓰기 권한 없음) |
-| None | 조회만 가능 |
+The repository creator becomes an Owner, and Owners include Maintainer permissions.
 
-저장소 생성자는 Owner가 되며, Owner는 Maintainer 권한을 포함합니다.
+## Current limitations and security boundaries
 
----
+- Push and merge support linear history only; merge commits are rejected.
+- Atomic forks and individual pull requests process at most 64 commits.
+- The Web3 commit view displays the 50 most recent commits on the selected branch.
+- IPFS data is public and unencrypted. Anyone who knows a CID can read its diff and metadata.
+- Persistent CID availability depends on at least one IPFS node pinning and serving the data.
+- The protocol v2 client is incompatible with older `BitRegistry` deployments and checks `PROTOCOL_VERSION` when connecting.
 
-## 현재 제약과 보안 경계
-
-- push와 merge는 linear history만 지원하며 merge commit은 거절됩니다.
-- atomic fork와 단일 PR은 최대 64개 커밋을 처리합니다.
-- 웹 commit 화면은 선택한 브랜치의 최근 50개 커밋을 표시합니다.
-- IPFS 데이터는 공개되어 있으며 암호화되지 않습니다. CID를 아는 사용자는 diff와 metadata를 읽을 수 있습니다.
-- CID의 지속적인 가용성은 하나 이상의 IPFS 노드가 데이터를 pin하고 제공하는지에 달려 있습니다.
-- protocol v2 client는 이전 BitRegistry 배포와 호환되지 않으며 연결 시 `PROTOCOL_VERSION`을 확인합니다.
-
----
-
-## 검증
+## Verification
 
 ```bash
 go test ./...
@@ -294,49 +284,43 @@ npm ci
 npm run compile
 ```
 
----
+The CLI end-to-end test guide is available in [English](tests/e2e/cli/README.md) and [Korean](tests/e2e/cli/README.ko.md).
 
-## 프로젝트 구조
+## Project structure
 
-```
+```text
 bit/
 ├── cmd/
 │   └── bit/
-│       └── main.go   # bit CLI 진입점
+│       └── main.go   # bit CLI entry point
 ├── internal/
-│   ├── cli/          # Cobra 커맨드와 CLI 입출력
-│   ├── app/          # 명령 실행 로직
-│   ├── chain/        # BitRegistry 컨트랙트 연동 (go-ethereum)
-│   ├── git/          # .git 읽기/쓰기 (go-git + exec git)
-│   ├── ipfs/         # IPFS HTTP API 클라이언트
-│   ├── cid/          # CIDv0 ↔ bytes32 변환 (외부 의존성 없음)
-│   ├── manifest/     # manifest JSON 인코딩/디코딩
-│   └── config/       # .bit/config.json 관리
+│   ├── cli/          # Cobra commands and CLI input/output
+│   ├── app/          # Command execution logic
+│   ├── chain/        # BitRegistry integration through go-ethereum
+│   ├── git/          # Git repository access through go-git and Git
+│   ├── ipfs/         # IPFS HTTP API client
+│   ├── cid/          # Dependency-free CIDv0 to bytes32 conversion
+│   ├── manifest/     # Manifest JSON encoding and decoding
+│   └── config/       # .bit/config.json management
 ├── contracts/
-│   ├── src/BitRegistry.sol   # Solidity 컨트랙트
-│   ├── tests/                # Foundry 컨트랙트 테스트
-│   └── scripts/              # CLI 호환 ABI 아티팩트 생성
+│   ├── src/BitRegistry.sol   # Solidity contracts
+│   ├── tests/                # Foundry contract tests
+│   └── scripts/              # CLI-compatible ABI artifact generation
 ├── tests/
-│   └── e2e/cli/              # CLI 종단 간 테스트
-└── package.json              # CLI 호환 ABI 생성용 Node.js 패키지
+│   └── e2e/cli/              # CLI end-to-end tests
+└── package.json              # Node.js package for ABI generation
 ```
 
----
+## Primary dependencies
 
-## 주요 의존성
+| Package | Purpose | License |
+|---|---|---|
+| `go-ethereum v1.17.0` | Ethereum client and ABI bindings | LGPL-3.0 (library) |
+| `go-git/v5 v5.19.1` | Read Git repositories | Apache-2.0 |
+| `cobra v1.8.1` | CLI framework | Apache-2.0 |
+| `golang.org/x/crypto v0.51.0` | Cryptographic utilities | BSD-3-Clause |
 
-| 패키지 | 용도 | 라이선스 |
-|--------|------|----------|
-| `go-ethereum v1.17.0` | 이더리움 클라이언트, ABI 바인딩 | LGPL-3.0 (library) |
-| `go-git/v5 v5.19.1` | Git 저장소 읽기 | Apache-2.0 |
-| `cobra v1.8.1` | CLI 프레임워크 | Apache-2.0 |
-| `golang.org/x/crypto v0.51.0` | 암호화 유틸리티 | BSD-3-Clause |
-
-정확한 적용 범위와 릴리스 시 유의사항은 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)를 확인하세요.
-
----
-
-## 개발과 검증
+## Development
 
 ```bash
 go test ./...
@@ -348,10 +332,8 @@ npm ci
 npm run compile
 ```
 
-기여 방법은 [CONTRIBUTING.md](CONTRIBUTING.md), 취약점 신고는 [SECURITY.md](SECURITY.md)를 참고하세요.
-
----
+See [CONTRIBUTING.md](CONTRIBUTING.md) to contribute and [SECURITY.md](SECURITY.md) to report a vulnerability.
 
 ## License
 
-이 저장소에서 작성한 Bit 소스 코드는 [MIT License](LICENSE)로 배포됩니다. 제3자 컴포넌트는 각자의 라이선스를 유지하며, 특히 `go-ethereum`을 링크한 CLI 바이너리를 배포할 때는 LGPL-3.0 의무를 함께 충족해야 합니다. 자세한 내용은 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)를 확인하세요.
+Bit source code authored in this repository is distributed under the [MIT License](LICENSE). Third-party components retain their respective licenses. In particular, distributions of the CLI binary linked with `go-ethereum` must comply with LGPL-3.0 obligations.
