@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/bit-logo-readme.png" alt="Bit logo" width="300" />
+  <img src="docs/assets/bit-logo-readme.png" alt="Bit logo" width="300" />
 </p>
 
 <h1 align="center">Bit</h1>

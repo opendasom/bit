@@ -1096,7 +1096,7 @@ function App() {
     <main className="page">
       <header className="siteHeader">
         <a className="siteBrand" href="/" aria-label="Go to home">
-          <img className="brandLogo" src="/bit-logo.png" alt="" aria-hidden="true" />
+          <img className="brandLogo" src="/assets/brand/bit-logo.png" alt="" aria-hidden="true" />
           <div>
             <div className="brandName">BIT</div>
             <div className="brandTag">Blockchain-based version control</div>
