@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# Shared helpers for the bit CLI test suite (test/cli-test).
+# Shared helpers for the bit CLI end-to-end suite (tests/e2e/cli).
 #
 # Every case file sources this to talk to the locally built `bit` binary,
 # a locally running anvil chain, and a locally running IPFS daemon. Nothing
 # here is bit-specific business logic - it's all plumbing (build, deploy,
 # git repo setup, chain reads, assertions).
 #
-# All behavior encoded in the case files (test/cli-test/cases/*.sh) was
+# All behavior encoded in the case files (tests/e2e/cli/cases/*.sh) was
 # manually verified against a live anvil + ipfs daemon before being written
 # down, so the comments there describe what actually happens, not guesses.
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 RPC_URL="${RPC_URL:-http://127.0.0.1:8545}"
 IPFS_URL="${IPFS_URL:-http://127.0.0.1:5001}"
 WORKDIR="${WORKDIR:-$(mktemp -d /tmp/bit-cli-test.XXXXXX)}"
@@ -97,7 +97,7 @@ check_ipfs() {
 
 build_bit() {
   log "building bit binary -> $BIT_BIN"
-  (cd "$REPO_ROOT" && go build -o "$BIT_BIN" .) || { log "go build failed"; exit 1; }
+  (cd "$REPO_ROOT" && go build -o "$BIT_BIN" ./cmd/bit) || { log "go build failed"; exit 1; }
 }
 
 deploy_contract() {

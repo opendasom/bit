@@ -3,14 +3,14 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-const root = process.cwd();
+const repositoryRoot = process.cwd();
 const candidates = [process.env.FOUNDRY_FORGE, "forge", path.join(os.homedir(), ".foundry", "bin", "forge")].filter(Boolean);
 
 let buildError = "forge executable was not found";
 let built = false;
 for (const executable of candidates) {
   const result = spawnSync(executable, ["build"], {
-    cwd: root,
+    cwd: repositoryRoot,
     encoding: "utf8",
   });
   if (result.status === 0) {
@@ -23,8 +23,8 @@ if (!built) {
   throw new Error(`Foundry build failed. Install Foundry or set FOUNDRY_FORGE.\n${buildError}`);
 }
 
-const foundryPath = path.join(root, "out", "BitRegistry.sol", "BitRegistry.json");
-const outputPath = path.join(root, "internal", "chain", "artifacts", "BitRegistry.json");
+const foundryPath = path.join(repositoryRoot, "out", "BitRegistry.sol", "BitRegistry.json");
+const outputPath = path.join(repositoryRoot, "internal", "chain", "artifacts", "BitRegistry.json");
 const foundryArtifact = JSON.parse(fs.readFileSync(foundryPath, "utf8"));
 const abiTypeOrder = new Map([
   ["error", 0],

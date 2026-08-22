@@ -2,9 +2,9 @@
   "name": "bit",
   "type": "module",
   "scripts": {
-    "anvil:seed": "node scripts/seed-anvil.mjs",
-    "compile": "node scripts/compile-contract.mjs",
-    "format:check": "prettier --check web/src vite.config.ts scripts/compile-contract.mjs package.json .prettierrc.json",
+    "anvil:seed": "node contracts/scripts/seed-anvil.mjs",
+    "compile": "node contracts/scripts/compile-contract.mjs",
+    "format:check": "prettier --check web/src vite.config.ts contracts/scripts/*.mjs package.json .prettierrc.json",
     "test:web": "vitest run",
     "typecheck": "tsc --noEmit",
     "web:dev": "vite --host 0.0.0.0",

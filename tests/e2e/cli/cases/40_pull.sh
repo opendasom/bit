@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test cases for `bit pull`.
+# End-to-end test cases for `bit pull`.
 
 # PULL-1: pulling into a brand-new (HEAD-less) repo reconstructs the exact
 # same commit hash git originally computed, not just "similar" content.

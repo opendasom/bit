@@ -6,9 +6,9 @@
 #   - `ipfs daemon` running with its API at $IPFS_URL (default http://127.0.0.1:5001)
 #
 # Usage:
-#   ./test/cli-test/run.sh              # run the standard case set
-#   RUN_SLOW=1 ./test/cli-test/run.sh   # also run the slow/opt-in cases (e.g. pagination)
-#   KEEP_WORKDIR=1 ./test/cli-test/run.sh  # keep the temp workspace for manual inspection after the run
+#   ./tests/e2e/cli/run.sh              # run the standard case set
+#   RUN_SLOW=1 ./tests/e2e/cli/run.sh   # also run the slow/opt-in cases (e.g. pagination)
+#   KEEP_WORKDIR=1 ./tests/e2e/cli/run.sh  # keep the temp workspace for manual inspection after the run
 #
 # Each `bit init` deploys nothing itself, but every case that needs a repo
 # calls `bit init` against ONE contract deployed fresh at the top of this

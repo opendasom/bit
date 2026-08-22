@@ -1,5 +1,6 @@
 # 빌드 바이너리
-bit
+/bit
+/bit.exe
 
 # IPFS 설치 파일
 kubo/

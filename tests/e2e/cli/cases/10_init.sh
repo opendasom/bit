@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test cases for `bit init`.
+# End-to-end test cases for `bit init`.
 
 # INIT-1: `bit init` must refuse to run outside a git repository.
 #

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Test cases for `bit remote add`.
-# These exercise parseRepoID (cmd/remote.go) purely through the CLI, by
+# End-to-end test cases for `bit remote add`.
+# These exercise parseRepoID (internal/cli/remote.go) purely through the CLI, by
 # inspecting what ends up in .bit/config.json.
 
 # REMOTE-1: a well-formed URL is parsed and stored correctly.

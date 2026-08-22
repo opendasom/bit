@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test cases for `bit push`.
+# End-to-end test cases for `bit push`.
 #
 # Setup shared by most cases here: a repo with a single root commit already
 # pushed to chain. Building this fresh per-case (instead of reusing one repo

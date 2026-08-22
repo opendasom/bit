@@ -21,7 +21,7 @@ const privateKeys = [
   "0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6",
 ];
 
-const artifactURL = new URL("../internal/chain/artifacts/BitRegistry.json", import.meta.url);
+const artifactURL = new URL("../../internal/chain/artifacts/BitRegistry.json", import.meta.url);
 const artifact = JSON.parse(await readFile(artifactURL, "utf8"));
 const abi = artifact.abi;
 const publicClient = createPublicClient({ chain: foundry, transport: http(rpcURL) });
