@@ -21,8 +21,9 @@ contact a maintainer through GitHub before sharing technical details publicly.
 
 ## Scope and safety
 
-The smart contracts, CLI, web explorer, build scripts, and CI configuration
-are in scope. Never test against mainnet contracts or wallets that hold real
+The smart contracts, CLI, and the web explorer maintained in the `bit-w3`
+repository are in scope, along with their build scripts and CI configuration.
+Never test against mainnet contracts or wallets that hold real
 value. Use a local Anvil chain or a disposable testnet wallet.
 
 Bit stores commit diffs and manifests on public content-addressed storage. Do
