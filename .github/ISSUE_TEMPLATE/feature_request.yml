@@ -1,0 +1,70 @@
+name: Feature request
+description: Propose an improvement to the Bit protocol, CLI, contracts, or Web3 explorer.
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem first. Substantial protocol or smart-contract changes should be discussed here before implementation.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Protocol
+        - CLI
+        - Smart contracts
+        - Web3 explorer
+        - IPFS integration
+        - Build or CI
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What limitation or user need should this proposal address?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Explain the desired behavior and user-visible workflow.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe workarounds or alternative designs and their tradeoffs.
+
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and migration
+      description: Note any effects on the ABI, storage format, deployed contracts, CLI, Web3 explorer, or existing repositories.
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add mockups, examples, references, or other relevant context.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues for similar proposals.
+          required: true
+        - label: This request does not disclose a security vulnerability or sensitive information.
+          required: true
