@@ -1,4 +1,4 @@
-package cmd
+package cli
 
 import (
 	"fmt"
@@ -11,12 +11,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var pullCmd = &cobra.Command{
-	Use:   "pull <remote> <branch>",
-	Short: "Pull branch from remote",
-	Args:  cobra.ExactArgs(2),
+var pushCmd = &cobra.Command{
+	Use:   "push <remote>",
+	Short: "Push current branch to remote",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		remoteName, branch := args[0], args[1]
+		remoteName := args[0]
 
 		cfg, err := config.Load(".")
 		if err != nil {
@@ -31,14 +31,18 @@ var pullCmd = &cobra.Command{
 			return err
 		}
 		repoID := new(big.Int).SetUint64(remote.RepoID)
+		privateKey, err := resolveSigningKey("", cfg)
+		if err != nil {
+			return err
+		}
 
-		chainClient, err := chain.NewReadOnlyClient(cfg.RPCURL, cfg.ContractAddress)
+		chainClient, err := chain.NewClient(cfg.RPCURL, cfg.ContractAddress, privateKey)
 		if err != nil {
 			return fmt.Errorf("체인 연결 실패: %w", err)
 		}
 		defer chainClient.Close()
 		ipfsClient := ipfs.NewClient(cfg.IPFSURL)
 
-		return app.Pull(chainClient, ipfsClient, ".", repoID, branch)
+		return app.Push(chainClient, ipfsClient, ".", repoID)
 	},
 }

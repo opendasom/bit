@@ -19,14 +19,14 @@ ipfs daemon           # API http://127.0.0.1:5001
 
 ## 실행 방법
 
-**`./test/cli-test/run.sh` .** 컨트랙트 배포부터 `bit`
+**`./tests/e2e/cli/run.sh` .** 컨트랙트 배포부터 `bit`
 바이너리 빌드까지 스크립트가 실행할 때마다 알아서 새로 함 (매번 새
 컨트랙트를 배포하므로 이전 실행 상태와 안 섞임).
 
 ```bash
-./test/cli-test/run.sh                 # 표준 케이스만 (48개 assertion)
-RUN_SLOW=1 ./test/cli-test/run.sh      # 페이지네이션 등 느린 케이스 포함
-KEEP_WORKDIR=1 ./test/cli-test/run.sh  # 끝나고 임시 작업 디렉토리를 안 지움 (실패 시 직접 들여다보기용)
+./tests/e2e/cli/run.sh                 # 표준 케이스만 (48개 assertion)
+RUN_SLOW=1 ./tests/e2e/cli/run.sh      # 페이지네이션 등 느린 케이스 포함
+KEEP_WORKDIR=1 ./tests/e2e/cli/run.sh  # 끝나고 임시 작업 디렉토리를 안 지움 (실패 시 직접 들여다보기용)
 ```
 
 끝나면 마지막에 `RESULTS: N passed, N failed, N skipped` 요약이 찍힘.

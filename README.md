@@ -71,7 +71,7 @@ IPFS와 이더리움 위에서 동작하는 실험적 분산 버전 관리 프�
 ```bash
 git clone https://github.com/opendasom/bit.git
 cd bit
-go build -o bit .
+go build -o bit ./cmd/bit
 
 # 전역 명령어로 등록 (선택)
 sudo cp ./bit /usr/local/bin/bit
@@ -324,16 +324,12 @@ npm run format:check
 
 ```
 bit/
-├── main.go
 ├── cmd/
-│   ├── root.go       # 루트 커맨드, 서브커맨드 등록
-│   ├── init.go       # bit init
-│   ├── remote.go     # bit remote add
-│   ├── push.go       # bit push
-│   ├── pull.go       # bit pull
-│   └── clone.go      # bit clone (read-only bootstrap)
+│   └── bit/
+│       └── main.go   # bit CLI 진입점
 ├── internal/
-│   ├── app/          # 명령 실행 로직 (cmd는 얇은 래퍼)
+│   ├── cli/          # Cobra 커맨드와 CLI 입출력
+│   ├── app/          # 명령 실행 로직
 │   ├── chain/        # BitRegistry 컨트랙트 연동 (go-ethereum)
 │   ├── git/          # .git 읽기/쓰기 (go-git + exec git)
 │   ├── ipfs/         # IPFS HTTP API 클라이언트
@@ -341,9 +337,13 @@ bit/
 │   ├── manifest/     # manifest JSON 인코딩/디코딩
 │   └── config/       # .bit/config.json 관리
 ├── contracts/
-│   └── src/BitRegistry.sol   # Solidity 컨트랙트
+│   ├── src/BitRegistry.sol   # Solidity 컨트랙트
+│   ├── tests/                # Foundry 컨트랙트 테스트
+│   └── scripts/              # 아티팩트 생성과 로컬 Anvil 시드
+├── tests/
+│   └── e2e/cli/              # CLI 종단 간 테스트
 ├── web/                      # React explorer 및 MetaMask workflow
-└── scripts/                  # 로컬 Anvil 시드 데이터
+└── package.json              # 웹 및 컨트랙트 도구 명령
 ```
 
 ---

@@ -20,14 +20,14 @@ Required tools: `go`, `forge`, `cast`, `anvil`, `ipfs`, `jq`, `git`, `curl`
 
 ## Running it
 
-**Just `./test/cli-test/run.sh`.** The script builds the `bit` binary and
+**Just `./tests/e2e/cli/run.sh`.** The script builds the `bit` binary and
 deploys a fresh contract every time it runs (a brand-new contract each
 run, so state never bleeds across separate runs).
 
 ```bash
-./test/cli-test/run.sh                 # standard cases only (48 assertions)
-RUN_SLOW=1 ./test/cli-test/run.sh      # also run slow cases (e.g. pagination)
-KEEP_WORKDIR=1 ./test/cli-test/run.sh  # keep the temp workspace after the run (for inspecting failures)
+./tests/e2e/cli/run.sh                 # standard cases only (48 assertions)
+RUN_SLOW=1 ./tests/e2e/cli/run.sh      # also run slow cases (e.g. pagination)
+KEEP_WORKDIR=1 ./tests/e2e/cli/run.sh  # keep the temp workspace after the run (for inspecting failures)
 ```
 
 At the end it prints a `RESULTS: N passed, N failed, N skipped` summary.
