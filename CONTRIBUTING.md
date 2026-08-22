@@ -20,8 +20,6 @@ Run the relevant checks before opening a pull request:
 go vet ./...
 go test ./...
 npm ci
-npm run typecheck
-npm run web:build
 npm run compile
 forge fmt --check
 forge test
@@ -33,7 +31,7 @@ exercises a running local Kubo node.
 ## Smart-contract changes
 
 Changes under `contracts/src` must update the checked-in ABI artifact used by
-the Go CLI and web explorer:
+the Go CLI and by the web explorer through the `bit-w3` submodule:
 
 ```bash
 npm run compile
@@ -43,6 +41,15 @@ git diff -- internal/chain/artifacts/BitRegistry.json
 The CI workflow verifies this artifact is current. Treat deployed contracts as
 immutable: document migration steps whenever an ABI or storage change requires
 a new deployment.
+
+## Web3 repository
+
+The browser application is maintained in
+[`opendasom/bit-w3`](https://github.com/opendasom/bit-w3). Its source checkout
+contains this repository as the `bit` submodule and has an independent Node.js
+package and CI workflow. Documentation, issues, security reports, and all other
+contributions for both repositories are coordinated through this `bit`
+repository.
 
 ## Pull requests
 

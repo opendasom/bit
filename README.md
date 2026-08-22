@@ -37,7 +37,7 @@ IPFS와 이더리움 위에서 동작하는 실험적 분산 버전 관리 프�
 | **Git client** | 익숙한 Git 저장소와 커밋을 로컬에서 생성하고, `bit` CLI로 원격 상태와 동기화합니다. |
 | **IPFS** | diff, manifest, repository metadata를 content-addressed 객체로 저장하고 복제합니다. |
 | **Ethereum** | `BitRegistry`가 repository·branch head·commit CID·역할을 기록해 상태와 권한을 검증합니다. |
-| **Web explorer** | IPFS와 체인 상태를 읽고, MetaMask 서명으로 fork·역할·PR 작업을 수행합니다. |
+| **Web explorer** | [`bit-w3`](https://github.com/opendasom/bit-w3)에서 IPFS와 체인 상태를 읽고, MetaMask 서명으로 fork·역할·PR 작업을 수행합니다. |
 
 ## 데모
 
@@ -63,8 +63,8 @@ IPFS와 이더리움 위에서 동작하는 실험적 분산 버전 관리 프�
 **사전 조건**
 
 - Go 1.25+ (`go.mod`의 toolchain 설정이 검증된 Go 버전을 선택합니다)
-- Node.js 20.19+ 및 npm
-- Foundry 1.7.1+ (`anvil`, `forge`) — 로컬 체인 및 컨트랙트 배포용
+- Foundry 1.7.1+ (`anvil`, `forge`) — 로컬 체인 및 컨트랙트 배포용 (선택)
+- Node.js 20.19+ — 컨트랙트 ABI 아티팩트 생성용 (선택)
 - IPFS 데몬 (Kubo) — `ipfs daemon`
 - 이더리움 노드 접근 (로컬: Anvil, 테스트넷: Sepolia 등)
 
@@ -107,8 +107,10 @@ forge create --broadcast \
 로컬 IPFS 데몬과 새 BitRegistry가 실행 중일 때 데모 저장소, 브랜치, 커밋, PR 상태를 추가할 수 있습니다.
 
 ```bash
-# 저장소 루트에서 실행
-cd ..
+# Web3 저장소에서 실행
+git clone --recurse-submodules https://github.com/opendasom/bit-w3.git
+cd bit-w3
+npm ci
 npm run anvil:seed
 ```
 
@@ -185,45 +187,21 @@ bit clone bit://local/0xYourContractAddress/1 other-project \
 - 현재 브랜치에 새 커밋이 없으면 PR 생성이 거절됩니다.
 - 실제 반영은 `approve` 시점에 다시 검증됩니다.
 
-> **주의**: indexed PR range와 atomic fork가 추가되어 ABI가 변경되었습니다. 기존 배포와 호환되지 않습니다. PR 설명은 체인에 저장됩니다. 새 BitRegistry를 배포했다면 `.env.local`의 `VITE_BIT_CONTRACT`를 새 주소로 변경하고 웹 개발 서버를 다시 시작하세요.
+> **주의**: indexed PR range와 atomic fork가 추가되어 ABI가 변경되었습니다. 기존 배포와 호환되지 않습니다. PR 설명은 체인에 저장됩니다. 새 BitRegistry를 배포했다면 `bit-w3`의 `.env.local`에서 `VITE_BIT_CONTRACT`를 새 주소로 변경하고 웹 개발 서버를 다시 시작하세요.
 
 ### 6. 웹 explorer
 
-현재 체인에 등록된 저장소 목록과 각 저장소의 커밋 메타데이터를 읽기 전용으로 확인할 수 있습니다.
+웹 explorer는 독립된 [`opendasom/bit-w3`](https://github.com/opendasom/bit-w3) 저장소에서 관리합니다. 해당 저장소는 이 저장소를 `bit` submodule로 포함하여 CLI와 동일한 `BitRegistry` ABI를 사용합니다.
 
 ```bash
-# 저장소 루트에서 실행
-cp .env.example .env.local
-# .env.local의 RPC URL, 체인 ID, 컨트랙트 주소, IPFS gateway를 환경에 맞게 수정
+git clone --recurse-submodules https://github.com/opendasom/bit-w3.git
+cd bit-w3
 npm ci
-npm run web:dev
+cp .env.example .env.local
+npm run dev
 ```
 
-로컬 연결값은 Git에 포함되지 않는 `.env.local`에 둡니다.
-
-```dotenv
-VITE_BIT_CHAIN_ID=31337
-VITE_BIT_RPC_URL=http://127.0.0.1:8545
-VITE_BIT_CONTRACT=0xYourContractAddress
-VITE_BIT_IPFS_API=/ipfs-api
-VITE_BIT_IPFS_GATEWAY=http://127.0.0.1:8080/ipfs
-```
-
-브라우저의 **Connection** 메뉴에서도 RPC URL, Contract, IPFS Gateway를 바꾸고 새로고침할 수 있습니다.
-
-- RPC URL: Anvil 또는 테스트넷 RPC URL
-- Contract: 배포된 `BitRegistry` 컨트랙트 주소
-- IPFS Gateway: 예: `http://127.0.0.1:8080/ipfs`
-- Chain ID: Anvil은 `31337`, Sepolia는 `11155111`
-- Branch: repository metadata의 default branch, 없으면 `main`
-
-웹 번들에는 private key를 넣지 않습니다.
-웹은 대부분의 데이터를 읽기용 gateway에서 가져옵니다. Fork 이름을 변경하면 새 repository metadata를 로컬 IPFS API에 업로드하며,
-개발 서버는 `/ipfs-api`를 `http://127.0.0.1:5001`로 프록시합니다.
-체인에 쓰는 fork, role 변경, PR 생성/승인/거부/닫기 트랜잭션은 MetaMask로 서명합니다.
-
-웹 화면은 커밋 메시지, 작성자, 작성일, 온체인 기록자, 온체인 기록 시간, 부모 커밋만 표시합니다. diff 내용은 표시하지 않습니다.
-다만 현재 diff CID는 온체인/IPFS에 공개되어 있으므로, 이는 UI 제한입니다. 코드 diff 자체를 비공개로 만들려면 diff 암호화와 권한별 복호화 키 관리가 추가로 필요합니다.
+웹 관련 문서, 이슈, 보안 신고 및 기타 기여는 모두 이 `bit` 저장소에서 통합 관리합니다.
 
 ---
 
@@ -312,10 +290,8 @@ bit clone <bit-url> [directory] --rpc <url> [--ipfs <url>] [--branch <branch>]
 go test ./...
 go vet ./...
 forge test
-npm run typecheck
-npm run test:web
-npm run web:build
-npm run format:check
+npm ci
+npm run compile
 ```
 
 ---
@@ -339,11 +315,10 @@ bit/
 ├── contracts/
 │   ├── src/BitRegistry.sol   # Solidity 컨트랙트
 │   ├── tests/                # Foundry 컨트랙트 테스트
-│   └── scripts/              # 아티팩트 생성과 로컬 Anvil 시드
+│   └── scripts/              # CLI 호환 ABI 아티팩트 생성
 ├── tests/
 │   └── e2e/cli/              # CLI 종단 간 테스트
-├── web/                      # React explorer 및 MetaMask workflow
-└── package.json              # 웹 및 컨트랙트 도구 명령
+└── package.json              # CLI 호환 ABI 생성용 Node.js 패키지
 ```
 
 ---
@@ -356,8 +331,6 @@ bit/
 | `go-git/v5 v5.19.1` | Git 저장소 읽기 | Apache-2.0 |
 | `cobra v1.8.1` | CLI 프레임워크 | Apache-2.0 |
 | `golang.org/x/crypto v0.51.0` | 암호화 유틸리티 | BSD-3-Clause |
-| `react`, `react-dom`, `viem` | 웹 explorer 런타임 | MIT |
-| `typescript` | 웹 빌드 도구 | Apache-2.0 |
 
 정확한 적용 범위와 릴리스 시 유의사항은 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)를 확인하세요.
 
@@ -372,7 +345,7 @@ go vet ./...
 cd contracts && forge test && cd ..
 
 npm ci
-npm run web:build
+npm run compile
 ```
 
 기여 방법은 [CONTRIBUTING.md](CONTRIBUTING.md), 취약점 신고는 [SECURITY.md](SECURITY.md)를 참고하세요.
