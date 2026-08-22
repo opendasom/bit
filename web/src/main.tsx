@@ -42,6 +42,45 @@ const defaultRpcURL = import.meta.env.VITE_BIT_RPC_URL ?? readStoredValue("bit.r
 const defaultContract = import.meta.env.VITE_BIT_CONTRACT ?? readStoredValue("bit.contract") ?? "0x34B9D83E03E2E7BF646E2452E0620E2F39cDbeE3";
 const defaultGateway = import.meta.env.VITE_BIT_IPFS_GATEWAY ?? readStoredValue("bit.ipfsGateway") ?? "https://ipfs.sugang.click/ipfs";
 
+type ErrorNotice = {
+  eyebrow: string;
+  title: string;
+  message: string;
+  details?: string;
+};
+
+function describeError(error: string, rpcURL: string): ErrorNotice {
+  if (/HTTP request failed|Failed to fetch|NetworkError|ECONNREFUSED/i.test(error)) {
+    let endpoint = rpcURL;
+    try {
+      endpoint = new URL(rpcURL).host;
+    } catch {
+      // Keep the configured value when it is not a valid URL yet.
+    }
+
+    return {
+      eyebrow: "Connection unavailable",
+      title: "체인에 연결할 수 없습니다.",
+      message: `${endpoint} RPC endpoint를 확인한 뒤 다시 시도하세요. 로컬 개발 중이라면 Anvil이 실행 중인지 확인하면 됩니다.`,
+      details: error,
+    };
+  }
+
+  if (/MetaMask/i.test(error)) {
+    return {
+      eyebrow: "Wallet required",
+      title: "MetaMask 설정이 필요합니다.",
+      message: error,
+    };
+  }
+
+  return {
+    eyebrow: "Request unavailable",
+    title: "요청을 완료하지 못했습니다.",
+    message: error,
+  };
+}
+
 function providerErrorCode(err: unknown): number | null {
   if (typeof err !== "object" || err === null || !("code" in err)) return null;
   return typeof err.code === "number" ? err.code : null;
@@ -1051,16 +1090,13 @@ function App() {
 
   const walletSummary = walletAddress ? `${shortAddress(walletAddress)} · ${formatChainId(walletChainId)}` : "";
   const workflowStep = WORKFLOW_STEPS[activeWorkflowStep];
+  const errorNotice = error ? describeError(error, rpcURL) : null;
 
   return (
     <main className="page">
       <header className="siteHeader">
         <a className="siteBrand" href="/" aria-label="Go to home">
-          <div className="brandMark" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </div>
+          <img className="brandLogo" src="/bit-logo.png" alt="" aria-hidden="true" />
           <div>
             <div className="brandName">BIT</div>
             <div className="brandTag">Blockchain-based version control</div>
@@ -1094,24 +1130,41 @@ function App() {
           </details>
           {walletAddress ? (
             <div className="headerChip headerWalletChip">
-              <span>MetaMask</span>
+              <span><i className="walletStatusDot" aria-hidden="true" />MetaMask</span>
               <strong className="mono">{walletSummary}</strong>
             </div>
           ) : (
-            <button type="button" className="ghostButton headerButton" onClick={connectWallet}>
+            <button type="button" className="headerButton" onClick={connectWallet}>
+              <span className="walletStatusDot" aria-hidden="true" />
               Connect MetaMask
             </button>
           )}
         </div>
       </header>
 
-      {error && (
-        <div className="errorBanner" role="alert">
-          <span>{error}</span>
-          <button type="button" onClick={() => setError("")} aria-label="Dismiss error">
-            ×
-          </button>
-        </div>
+      {errorNotice && (
+        <section className="errorBanner" role="status" aria-live="polite">
+          <span className="errorIcon" aria-hidden="true">!</span>
+          <div className="errorCopy">
+            <span className="errorEyebrow">{errorNotice.eyebrow}</span>
+            <strong>{errorNotice.title}</strong>
+            <p>{errorNotice.message}</p>
+            {errorNotice.details && (
+              <details className="errorDetails">
+                <summary>기술 정보 보기</summary>
+                <code>{errorNotice.details}</code>
+              </details>
+            )}
+          </div>
+          <div className="errorActions">
+            <button type="button" className="errorRetry" onClick={() => window.location.reload()} aria-label="다시 시도" title="다시 시도">
+              ↻
+            </button>
+            <button type="button" className="errorDismiss" onClick={() => setError("")} aria-label="오류 안내 닫기">
+              ×
+            </button>
+          </div>
+        </section>
       )}
 
       {page === "home" && (
@@ -1233,12 +1286,7 @@ function App() {
 
               <div className="commandStudio">
                 <div className="studioTabs">
-                  <div className="studioTab">
-                    <span className="fileDot" /> {workflowStep.fileName}
-                  </div>
-                  <div className="studioStatus">
-                    <i /> live example
-                  </div>
+                  <div className="studioTab"><span className="fileDot" /> {workflowStep.fileName}</div>
                 </div>
                 <div className="codeEditor mono">
                   <div className="editorLine">

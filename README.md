@@ -1,25 +1,62 @@
-# bit
+<p align="center">
+  <img src="public/bit-logo-readme.png" alt="Bit logo" width="300" />
+</p>
 
-IPFS와 이더리움 블록체인 위에서 동작하는 탈중앙화 버전 관리 시스템(DVCS).
+<h1 align="center">Bit</h1>
 
-커밋 diff와 메타데이터는 IPFS에, 브랜치/커밋 상태는 스마트 컨트랙트(BitRegistry)에 저장됩니다.
-중앙 Git 서버 없이 코드 히스토리를 content-addressed 형태로 저장하고 누구나 검증할 수 있습니다.
-실제 가용성은 하나 이상의 IPFS 노드가 CID를 pin하고 제공하는 동안 유지됩니다.
+<p align="center">
+  <strong>An open protocol for verifiable source history.</strong><br />
+  Git-compatible workflows, content-addressed data on IPFS, and repository state verified on Ethereum.
+</p>
 
----
+<p align="center">
+  <a href="https://github.com/opendasom/bit/actions/workflows/ci.yml"><img src="https://github.com/opendasom/bit/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-7cd39c?style=flat-square" alt="MIT License" /></a>
+  <img src="https://img.shields.io/badge/status-alpha-f3ae84?style=flat-square" alt="Alpha status" />
+</p>
 
-## 영상
+<p align="center">
+  <a href="#빠른-시작">Quick start</a> ·
+  <a href="#데모">Demos</a> ·
+  <a href="#명령어-참조">CLI reference</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a> ·
+  <a href="SECURITY.md">Security</a>
+</p>
 
-1. Maintainer Creating Repository  
-[![Video Label](http://img.youtube.com/vi/f56hsj97zWA/0.jpg)](https://youtu.be/f56hsj97zWA)
+IPFS와 이더리움 위에서 동작하는 실험적 분산 버전 관리 프로토콜입니다. 커밋 diff와 메타데이터는 IPFS에, 브랜치·커밋 상태는 `BitRegistry` 스마트 컨트랙트에 저장합니다.
 
-2. Contributor Developing  
-[![Video Label](http://img.youtube.com/vi/HiM1U8WBm3g/0.jpg)](https://youtu.be/HiM1U8WBm3g)
+> [!WARNING]
+> **Alpha software.** 프로토콜과 저장 형식은 변경될 수 있으며, 프로덕션 사용이나 실제 자산이 걸린 환경을 위한 보안 감사를 받지 않았습니다.
 
-3. Maintainer Approving PR  
-[![Video Label](http://img.youtube.com/vi/qIJjybwHhjo/0.jpg)](https://youtu.be/qIJjybwHhjo)
+중앙 Git 서버 없이 코드 히스토리를 content-addressed 형태로 저장하고 누구나 검증할 수 있습니다. 온체인 레코드는 히스토리의 무결성을 검증할 수 있게 하지만, IPFS 데이터의 가용성은 핀(pin)과 복제 상태에 달려 있습니다. 중요한 데이터는 자체 IPFS 노드 또는 신뢰할 수 있는 pinning 서비스에 보관하세요.
 
----
+## 핵심 구성
+
+| 계층 | Bit가 하는 일 |
+|---|---|
+| **Git client** | 익숙한 Git 저장소와 커밋을 로컬에서 생성하고, `bit` CLI로 원격 상태와 동기화합니다. |
+| **IPFS** | diff, manifest, repository metadata를 content-addressed 객체로 저장하고 복제합니다. |
+| **Ethereum** | `BitRegistry`가 repository·branch head·commit CID·역할을 기록해 상태와 권한을 검증합니다. |
+| **Web explorer** | IPFS와 체인 상태를 읽고, MetaMask 서명으로 fork·역할·PR 작업을 수행합니다. |
+
+## 데모
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <a href="https://youtu.be/f56hsj97zWA"><img src="https://img.youtube.com/vi/f56hsj97zWA/0.jpg" alt="Maintainer creating a repository" /></a><br />
+      <strong>Maintainer creates a repository</strong>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://youtu.be/HiM1U8WBm3g"><img src="https://img.youtube.com/vi/HiM1U8WBm3g/0.jpg" alt="Contributor developing" /></a><br />
+      <strong>Contributor develops a change</strong>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://youtu.be/qIJjybwHhjo"><img src="https://img.youtube.com/vi/qIJjybwHhjo/0.jpg" alt="Maintainer approving a pull request" /></a><br />
+      <strong>Maintainer approves a pull request</strong>
+    </td>
+  </tr>
+</table>
 
 ## 설치
 
@@ -27,7 +64,7 @@ IPFS와 이더리움 블록체인 위에서 동작하는 탈중앙화 버전 관
 
 - Go 1.25+ (`go.mod`의 toolchain 설정이 검증된 Go 버전을 선택합니다)
 - Node.js 20.19+ 및 npm
-- Foundry 1.7.1+
+- Foundry 1.7.1+ (`anvil`, `forge`) — 로컬 체인 및 컨트랙트 배포용
 - IPFS 데몬 (Kubo) — `ipfs daemon`
 - 이더리움 노드 접근 (로컬: Anvil, 테스트넷: Sepolia 등)
 
@@ -70,10 +107,13 @@ forge create --broadcast \
 로컬 IPFS 데몬과 새 BitRegistry가 실행 중일 때 데모 저장소, 브랜치, 커밋, PR 상태를 추가할 수 있습니다.
 
 ```bash
+# 저장소 루트에서 실행
+cd ..
 npm run anvil:seed
 ```
 
 시드 명령은 기본 Anvil 계정 4개를 사용하며 비어 있는 registry에서 한 번만 실행합니다.
+README에 나온 private key는 Anvil의 공개된 **로컬 테스트 전용** 키입니다. 어떤 테스트넷이나 메인넷에서도 사용하면 안 됩니다.
 
 ---
 
@@ -103,6 +143,8 @@ bit init \
 # URL 형식: bit://<network>/<contractAddress>/<repoId>
 bit remote add origin bit://local/0xYourContractAddress/1
 ```
+
+현재 CLI는 remote URL에서 `repoId`를 읽고, RPC URL과 컨트랙트 주소는 `bit init`으로 만든 `.bit/config.json`을 사용합니다. URL의 network·contract 값과 로컬 설정 값은 같은 배포 환경을 가리키도록 맞추세요.
 
 ### 3. push
 
@@ -143,13 +185,16 @@ bit clone bit://local/0xYourContractAddress/1 other-project \
 - 현재 브랜치에 새 커밋이 없으면 PR 생성이 거절됩니다.
 - 실제 반영은 `approve` 시점에 다시 검증됩니다.
 
-> **주의**: indexed PR range와 atomic fork가 추가되어 ABI가 변경되었습니다. 기존 배포와 호환되지 않습니다.
+> **주의**: indexed PR range와 atomic fork가 추가되어 ABI가 변경되었습니다. 기존 배포와 호환되지 않습니다. PR 설명은 체인에 저장됩니다. 새 BitRegistry를 배포했다면 `.env.local`의 `VITE_BIT_CONTRACT`를 새 주소로 변경하고 웹 개발 서버를 다시 시작하세요.
 
 ### 6. 웹 explorer
 
 현재 체인에 등록된 저장소 목록과 각 저장소의 커밋 메타데이터를 읽기 전용으로 확인할 수 있습니다.
 
 ```bash
+# 저장소 루트에서 실행
+cp .env.example .env.local
+# .env.local의 RPC URL, 체인 ID, 컨트랙트 주소, IPFS gateway를 환경에 맞게 수정
 npm ci
 npm run web:dev
 ```
@@ -169,6 +214,7 @@ VITE_BIT_IPFS_GATEWAY=http://127.0.0.1:8080/ipfs
 - RPC URL: Anvil 또는 테스트넷 RPC URL
 - Contract: 배포된 `BitRegistry` 컨트랙트 주소
 - IPFS Gateway: 예: `http://127.0.0.1:8080/ipfs`
+- Chain ID: Anvil은 `31337`, Sepolia는 `11155111`
 - Branch: repository metadata의 default branch, 없으면 `main`
 
 웹 번들에는 private key를 넣지 않습니다.
@@ -296,16 +342,43 @@ bit/
 │   └── config/       # .bit/config.json 관리
 ├── contracts/
 │   └── src/BitRegistry.sol   # Solidity 컨트랙트
-└── web/                      # React explorer 및 MetaMask workflow
+├── web/                      # React explorer 및 MetaMask workflow
+└── scripts/                  # 로컬 Anvil 시드 데이터
 ```
 
 ---
 
-## 의존성
+## 주요 의존성
 
-| 패키지 | 용도 |
-|--------|------|
-| `go-ethereum v1.17.0` | 이더리움 클라이언트, ABI 바인딩 |
-| `go-git/v5 v5.19.1` | git 저장소 읽기 |
-| `cobra v1.8.1` | CLI 프레임워크 |
-| `golang.org/x/crypto v0.51.0` | 암호화 유틸리티 |
+| 패키지 | 용도 | 라이선스 |
+|--------|------|----------|
+| `go-ethereum v1.17.0` | 이더리움 클라이언트, ABI 바인딩 | LGPL-3.0 (library) |
+| `go-git/v5 v5.19.1` | Git 저장소 읽기 | Apache-2.0 |
+| `cobra v1.8.1` | CLI 프레임워크 | Apache-2.0 |
+| `golang.org/x/crypto v0.51.0` | 암호화 유틸리티 | BSD-3-Clause |
+| `react`, `react-dom`, `viem` | 웹 explorer 런타임 | MIT |
+| `typescript` | 웹 빌드 도구 | Apache-2.0 |
+
+정확한 적용 범위와 릴리스 시 유의사항은 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)를 확인하세요.
+
+---
+
+## 개발과 검증
+
+```bash
+go test ./...
+go vet ./...
+
+cd contracts && forge test && cd ..
+
+npm ci
+npm run web:build
+```
+
+기여 방법은 [CONTRIBUTING.md](CONTRIBUTING.md), 취약점 신고는 [SECURITY.md](SECURITY.md)를 참고하세요.
+
+---
+
+## License
+
+이 저장소에서 작성한 Bit 소스 코드는 [MIT License](LICENSE)로 배포됩니다. 제3자 컴포넌트는 각자의 라이선스를 유지하며, 특히 `go-ethereum`을 링크한 CLI 바이너리를 배포할 때는 LGPL-3.0 의무를 함께 충족해야 합니다. 자세한 내용은 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)를 확인하세요.

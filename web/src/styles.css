@@ -78,27 +78,11 @@ button {
   color: inherit;
 }
 
-.brandMark {
-  position: relative;
-  width: 28px;
-  height: 28px;
-  border: 1px solid rgba(239, 243, 239, 0.22);
-  border-radius: 7px;
-  transform: rotate(45deg);
-}
-
-.brandMark span {
-  position: absolute;
-  inset: 6px;
-  border: 1px solid rgba(124, 211, 156, 0.22);
-}
-
-.brandMark span:nth-child(2) {
-  inset: 10px;
-}
-
-.brandMark span:nth-child(3) {
-  inset: 14px;
+.brandLogo {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  flex: 0 0 auto;
 }
 
 .brandName {
@@ -115,11 +99,16 @@ button {
 }
 
 .headerActions {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
 }
 
 .connectionSettings {
@@ -169,49 +158,63 @@ button {
 }
 
 .headerField {
-  display: grid;
-  gap: 3px;
-  min-width: 280px;
+  display: flex;
+  align-items: center;
+  min-width: 320px;
+  min-height: 42px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.16);
 }
 
 .headerField span {
+  flex: 0 0 auto;
+  padding-right: 9px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 10px;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: rgba(239, 243, 239, 0.46);
 }
 
 .headerInput {
-  width: 100%;
-  min-height: 38px;
-  padding: 0 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
+  min-width: 0;
+  flex: 1 1 auto;
+  min-height: 32px;
+  padding: 0 0 0 10px;
+  border: 0;
+  background: transparent;
   color: #eff3ef;
   outline: none;
 }
 
-.headerInput:focus {
-  border-color: rgba(124, 211, 156, 0.36);
+.headerField:focus-within {
+  background: rgba(124, 211, 156, 0.07);
   box-shadow: 0 0 0 3px rgba(124, 211, 156, 0.08);
 }
 
 .headerChip {
-  display: grid;
-  gap: 3px;
-  padding: 8px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid rgba(124, 211, 156, 0.16);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(124, 211, 156, 0.08);
   min-width: 0;
 }
 
 .headerChip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 10px;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(239, 243, 239, 0.46);
+  color: rgba(205, 249, 218, 0.68);
 }
 
 .headerChip strong {
@@ -220,12 +223,42 @@ button {
 }
 
 .headerWalletChip {
-  min-width: 152px;
+  min-width: 176px;
 }
 
 .headerButton {
-  min-height: 38px;
-  padding-inline: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 14px;
+  border-color: rgba(124, 211, 156, 0.44);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #a2e6b5, #78c990);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 4px 14px rgba(67, 158, 96, 0.16);
+  color: #0b2113;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.headerButton:hover {
+  border-color: #b8f1c8;
+  background: linear-gradient(180deg, #b3edc3, #87d69e);
+}
+
+.walletStatusDot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px rgba(11, 33, 19, 0.12);
+}
+
+.headerWalletChip .walletStatusDot {
+  color: #91e6aa;
+  box-shadow: 0 0 0 3px rgba(145, 230, 170, 0.1);
 }
 
 button:disabled {
@@ -1080,26 +1113,117 @@ input:focus {
 }
 
 .errorBanner {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin: 0 24px 14px;
-  padding: 13px 14px;
-  border-left: 3px solid #de7b6a;
-  border-radius: 8px;
-  background: rgba(222, 123, 106, 0.08);
-  color: #ffd8d2;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  width: min(calc(100% - (var(--page-gutter) * 2)), var(--content-width));
+  margin: 14px auto 0;
+  padding: 14px;
+  border: 1px solid rgba(243, 174, 132, 0.28);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(243, 174, 132, 0.12), rgba(222, 123, 106, 0.06));
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+  color: #fff1e9;
 }
 
-.errorBanner button {
-  flex: 0 0 auto;
-  padding: 0 4px;
-  border: 0;
-  background: transparent;
-  color: inherit;
+.errorIcon {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  background: #f3ae84;
+  color: #24120d;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.errorCopy {
+  min-width: 0;
+}
+
+.errorEyebrow {
+  display: block;
+  margin-bottom: 3px;
+  color: rgba(255, 231, 215, 0.62);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.errorCopy strong {
+  display: block;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.errorCopy p {
+  margin: 4px 0 0;
+  color: rgba(255, 241, 233, 0.72);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.errorActions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.errorRetry,
+.errorDismiss {
+  min-height: 32px;
+  border-color: rgba(255, 239, 227, 0.18);
+  background: rgba(255, 239, 227, 0.06);
+  color: #fff1e9;
+}
+
+.errorRetry {
+  width: 32px;
+  padding: 0;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.errorDismiss {
+  width: 32px;
+  padding: 0;
   font-size: 20px;
   line-height: 1;
+}
+
+.errorRetry:hover,
+.errorDismiss:hover {
+  border-color: rgba(255, 239, 227, 0.34);
+  background: rgba(255, 239, 227, 0.12);
+}
+
+.errorDetails {
+  margin-top: 9px;
+}
+
+.errorDetails summary {
+  width: fit-content;
+  color: rgba(255, 241, 233, 0.72);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.errorDetails code {
+  display: block;
+  max-height: 130px;
+  margin-top: 8px;
+  padding: 9px 10px;
+  overflow: auto;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.24);
+  color: rgba(255, 241, 233, 0.66);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .branchItem:disabled {
@@ -1840,6 +1964,7 @@ input:focus {
   }
 
   .headerActions {
+    width: 100%;
     justify-content: flex-start;
   }
 
@@ -1849,8 +1974,9 @@ input:focus {
   }
 
   .headerField {
+    flex: 1 1 320px;
     min-width: 0;
-    width: 100%;
+    width: auto;
   }
 
   .heroVisual {
@@ -1882,6 +2008,27 @@ input:focus {
 }
 
 @media (max-width: 760px) {
+  .siteHeader {
+    padding: 14px var(--page-gutter);
+  }
+
+  .headerActions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .headerField,
+  .headerButton,
+  .headerWalletChip {
+    width: 100%;
+  }
+
+  .headerButton,
+  .headerWalletChip {
+    min-height: 40px;
+  }
+
   .forkPageHeader {
     display: grid;
   }
