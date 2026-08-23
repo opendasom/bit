@@ -10,6 +10,8 @@ import (
 	"github.com/opendasom/bit/internal/manifest"
 )
 
+// pendingCommit is a commit that has been downloaded and verified against
+// on-chain metadata but not yet applied to the local git repository.
 type pendingCommit struct {
 	record   chain.BranchCommitRecord
 	manifest *manifest.Manifest

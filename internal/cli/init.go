@@ -13,6 +13,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// initCmd implements `bit init`: it requires an existing .git repository,
+// uploads repo metadata to IPFS, registers a new repo on-chain, and writes
+// the resulting repo ID and connection settings to .bit/config.json.
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize a new bit repository",
@@ -25,7 +28,7 @@ var initCmd = &cobra.Command{
 		repoDescription, _ := cmd.Flags().GetString("description")
 		defaultBranch, _ := cmd.Flags().GetString("branch")
 
-		// 1. .git 존재 여부 확인 (git init이 되어있어야 함)
+		// 1. Verify .git exists (git init must have been run already)
 		if _, err := os.Stat(".git"); os.IsNotExist(err) {
 			return fmt.Errorf(".git 디렉토리가 없습니다. 먼저 git init을 실행하세요")
 		}
@@ -64,7 +67,7 @@ var initCmd = &cobra.Command{
 		fmt.Printf("체인 저장소 생성 완료 (repoId: %s)\n", repoID.String())
 		fmt.Printf("repo metadata 등록 완료: %s\n", metadataCID)
 
-		// .bit/config.json 생성
+		// Write .bit/config.json
 		cfg := &config.Config{
 			RPCURL:          rpcURL,
 			ContractAddress: contractAddress,

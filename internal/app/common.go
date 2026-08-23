@@ -7,6 +7,9 @@ import (
 	"github.com/opendasom/bit/internal/chain"
 )
 
+// loadBranchRecords fetches every commit record for a branch from the chain,
+// paging through GetBranchCommitsWithMetadata since contracts typically cap
+// the number of records returned per call.
 func loadBranchRecords(chainClient ChainClient, repoID *big.Int, branch string, total int) ([]chain.BranchCommitRecord, error) {
 	const pageSize = 100
 	records := make([]chain.BranchCommitRecord, 0, total)

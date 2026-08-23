@@ -14,6 +14,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// cloneCmd implements `bit clone`: it creates a fresh git repository at the
+// target directory, points it at the given bit:// remote, and pulls the
+// requested branch. Unlike `bit init`/`bit push`, it never needs a signing
+// key since it only reads from the chain and IPFS.
 var cloneCmd = &cobra.Command{
 	Use:   "clone <url> [directory]",
 	Short: "Clone an existing Bit repository without a signing key",

@@ -11,6 +11,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// remoteCmd groups subcommands for managing the bit://<network>/<registry>/<repoId>
+// remotes recorded in .bit/config.json.
 var remoteCmd = &cobra.Command{
 	Use:   "remote",
 	Short: "Manage remotes",
@@ -51,7 +53,8 @@ var remoteAddCmd = &cobra.Command{
 	},
 }
 
-// parseRepoID는 bit://<network>/<registry>/<repoId> 에서 repoId를 추출한다.
+// parsedRemote holds the components of a bit:// remote URL:
+// bit://<network>/<registry-contract-address>/<repoId>
 type parsedRemote struct {
 	Network         string
 	ContractAddress string

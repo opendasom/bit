@@ -1,3 +1,8 @@
+// Package git wraps the local `git` CLI (and go-git for read-only HEAD
+// inspection) to read commit history, extract diffs for push, and
+// reconstruct commits from downloaded diffs for pull. It never talks to
+// IPFS or the chain directly; those concerns live in internal/ipfs,
+// internal/chain, and internal/app.
 package git
 
 import (
@@ -12,13 +17,16 @@ import (
 	"github.com/opendasom/bit/internal/manifest"
 )
 
-// HeadInfo는 로컬 .git에서 읽은 현재 브랜치와 커밋 정보를 담는다.
+// HeadInfo holds the current branch and commit information read from
+// the local .git directory.
 type HeadInfo struct {
-	Branch     string // 현재 브랜치명 (예: "main")
-	CommitHash string // 현재 커밋 해시
-	ParentHash string // 부모 커밋 해시 (초기 커밋이면 빈 문자열)
+	Branch     string // current branch name (e.g. "main")
+	CommitHash string // current commit hash
+	ParentHash string // parent commit hash (empty for the initial commit)
 }
 
+// CommitInfo is the parsed metadata of a single git commit object, as
+// produced by ReadCommit and consumed when building manifests for push.
 type CommitInfo struct {
 	Hash           string
 	TreeHash       string
@@ -32,6 +40,8 @@ type CommitInfo struct {
 	Message        string
 }
 
+// InitRepository runs `git init` at repoPath, used by `bit clone` to create
+// the local repository before pulling history into it.
 func InitRepository(repoPath string) error {
 	_, err := runGit(repoPath, "init")
 	return err
@@ -83,9 +93,9 @@ func runGitEnvInput(repoPath string, env []string, input []byte, args ...string)
 	return out.Bytes(), nil
 }
 
-// ReadHead는 로컬 git 저장소에서 현재 HEAD 정보를 읽어 반환한다.
-// repoPath: git 저장소 루트 경로 (예: ".")
-// push 시 커밋 해시와 브랜치명을 읽을 때 사용한다.
+// ReadHead reads the current HEAD information from the local git
+// repository at repoPath (the repo root, e.g. "."). Used by push to read
+// the current commit hash and branch name.
 func ReadHead(repoPath string) (*HeadInfo, error) {
 	repo, err := gogit.PlainOpen(repoPath)
 	if err != nil {
@@ -100,7 +110,7 @@ func ReadHead(repoPath string) (*HeadInfo, error) {
 	commitHash := head.Hash().String()
 	branch := head.Name().Short()
 
-	// 부모 커밋 해시 읽기 (초기 커밋이면 ParentHashes가 비어있음)
+	// Read the parent commit hash; ParentHashes is empty for the initial commit.
 	parentHash := ""
 	commit, err := repo.CommitObject(head.Hash())
 	if err == nil && len(commit.ParentHashes) > 0 {
@@ -114,6 +124,8 @@ func ReadHead(repoPath string) (*HeadInfo, error) {
 	}, nil
 }
 
+// CurrentBranch returns the name of the currently checked-out branch. It
+// fails if HEAD is detached, since bit tracks history per named branch.
 func CurrentBranch(repoPath string) (string, error) {
 	out, err := runGit(repoPath, "branch", "--show-current")
 	if err != nil {
@@ -126,6 +138,7 @@ func CurrentBranch(repoPath string) (string, error) {
 	return branch, nil
 }
 
+// CurrentHead returns the full hash of the current HEAD commit.
 func CurrentHead(repoPath string) (string, error) {
 	out, err := runGit(repoPath, "rev-parse", "--verify", "HEAD")
 	if err != nil {
@@ -134,11 +147,17 @@ func CurrentHead(repoPath string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+// HasHead reports whether repoPath has any commits yet, i.e. whether HEAD
+// resolves to a valid commit.
 func HasHead(repoPath string) bool {
 	_, err := runGit(repoPath, "rev-parse", "--verify", "HEAD")
 	return err == nil
 }
 
+// CommitsAfter lists commit hashes on the current branch after baseCommit,
+// oldest first. If baseCommit is empty, it returns the entire history up to
+// HEAD. It errors if baseCommit is not an ancestor of HEAD, since that means
+// the local branch has diverged from what was last pushed.
 func CommitsAfter(repoPath, baseCommit string) ([]string, error) {
 	var args []string
 	if baseCommit == "" {
@@ -160,6 +179,8 @@ func CommitsAfter(repoPath, baseCommit string) ([]string, error) {
 	return strings.Split(text, "\n"), nil
 }
 
+// ReadCommit reads and parses a single commit object with `git cat-file`,
+// returning its tree, parents, author/committer identities, and message.
 func ReadCommit(repoPath, commitHash string) (*CommitInfo, error) {
 	resolved, err := runGit(repoPath, "rev-parse", "--verify", commitHash+"^{commit}")
 	if err != nil {
@@ -207,6 +228,10 @@ func ReadCommit(repoPath, commitHash string) (*CommitInfo, error) {
 	return info, nil
 }
 
+// parseCommitIdentity parses a raw "author"/"committer" header line body of
+// the form "Name <email> <unix-timestamp> <timezone>" into its parts. The
+// returned date is in git's "@<timestamp> <timezone>" format, ready to pass
+// as a GIT_AUTHOR_DATE/GIT_COMMITTER_DATE value.
 func parseCommitIdentity(raw string) (name, email, date string, err error) {
 	emailEnd := strings.LastIndex(raw, ">")
 	emailStart := strings.LastIndex(raw[:emailEnd+1], " <")
@@ -223,6 +248,9 @@ func parseCommitIdentity(raw string) (name, email, date string, err error) {
 	return name, email, date, nil
 }
 
+// ExtractCommitDiff returns the binary patch for a single commit: a full
+// diff against an empty tree for a root commit, or a diff against its first
+// parent otherwise. This is the payload uploaded to IPFS on push.
 func ExtractCommitDiff(repoPath string, info *CommitInfo) ([]byte, error) {
 	if len(info.ParentHashes) == 0 {
 		return runGit(repoPath, "diff-tree", "--root", "--binary", "--full-index", "--patch", "--no-commit-id", info.Hash)
@@ -230,6 +258,9 @@ func ExtractCommitDiff(repoPath string, info *CommitInfo) ([]byte, error) {
 	return runGit(repoPath, "diff", "--binary", "--full-index", info.ParentHashes[0], info.Hash)
 }
 
+// ManifestForCommit builds the manifest that gets uploaded to IPFS alongside
+// a commit's diff, capturing everything needed to reconstruct the commit
+// (tree hash, parents, author/committer identity, and message) on pull.
 func ManifestForCommit(branch string, info *CommitInfo, diffCID string) *manifest.Manifest {
 	return &manifest.Manifest{
 		Version:       manifest.VersionCommitDiff,
@@ -254,6 +285,9 @@ func ManifestForCommit(branch string, info *CommitInfo, diffCID string) *manifes
 	}
 }
 
+// ApplyCommitDiff builds a commit from a manifest and diff via
+// BuildCommitDiff, then checks out the branch at the resulting commit. The
+// worktree must be clean beforehand.
 func ApplyCommitDiff(repoPath string, m *manifest.Manifest, diff []byte) error {
 	if err := ensureCleanWorktree(repoPath); err != nil {
 		return err
@@ -348,6 +382,8 @@ func BuildCommitDiff(repoPath string, m *manifest.Manifest, diff []byte) (string
 	return newHash, nil
 }
 
+// CheckoutBranch force-creates (or resets) branch to point at commitHash and
+// checks it out, requiring a clean worktree first.
 func CheckoutBranch(repoPath, branch, commitHash string) error {
 	if branch == "" {
 		return errors.New("branch is empty")
@@ -359,6 +395,9 @@ func CheckoutBranch(repoPath, branch, commitHash string) error {
 	return err
 }
 
+// EnsureCleanWorktree returns an error unless the worktree has no
+// uncommitted changes (untracked .bit/ state is ignored). Callers use this
+// to avoid clobbering local work before checking out a different commit.
 func EnsureCleanWorktree(repoPath string) error {
 	return ensureCleanWorktree(repoPath)
 }
@@ -378,9 +417,9 @@ func ensureCleanWorktree(repoPath string) error {
 	return nil
 }
 
-// ExtractBundle은 현재 저장소의 모든 Git 객체를 bundle 형태로 추출해 반환한다.
-// push 시 코드 전체를 IPFS에 업로드하기 위해 사용한다.
-// 내부적으로 "git bundle create - --all"을 실행한다.
+// ExtractBundle extracts every Git object in the current repository as a
+// bundle. Used by push to upload the full repository history to IPFS.
+// Internally runs "git bundle create - --all".
 func ExtractBundle(repoPath string) ([]byte, error) {
 	cmd := exec.Command("git", "bundle", "create", "-", "--all")
 	cmd.Dir = repoPath
@@ -392,11 +431,12 @@ func ExtractBundle(repoPath string) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-// ApplyBundle은 IPFS에서 받은 bundle 데이터를 로컬 git 저장소에 반영한다.
-// pull 시 다운로드한 코드를 로컬에 적용할 때 사용한다.
-// 내부적으로 "git bundle unbundle -" 후 "git checkout -b <branch> <commit>"을 실행한다.
+// ApplyBundle applies bundle data downloaded from IPFS to the local git
+// repository. Used by pull to apply downloaded history locally.
+// Internally runs "git bundle unbundle -" followed by
+// "git checkout -b <branch> <commit>".
 func ApplyBundle(repoPath string, data []byte) error {
-	// bundle을 로컬 .git에 풀기
+	// Unpack the bundle into the local .git directory.
 	unbundle := exec.Command("git", "bundle", "unbundle", "-")
 	unbundle.Dir = repoPath
 	unbundle.Stdin = bytes.NewReader(data)
@@ -406,8 +446,8 @@ func ApplyBundle(repoPath string, data []byte) error {
 		return err
 	}
 
-	// unbundle 출력에서 커밋 해시와 브랜치명 추출
-	// 출력 형식: "<commitHash> refs/heads/<branch>"
+	// Extract the commit hash and branch name from the unbundle output.
+	// Output format: "<commitHash> refs/heads/<branch>"
 	var commitHash, refName string
 	if _, err := fmt.Sscanf(out.String(), "%s %s", &commitHash, &refName); err != nil {
 		return fmt.Errorf("invalid git bundle output: %w", err)
@@ -417,7 +457,7 @@ func ApplyBundle(repoPath string, data []byte) error {
 	}
 	branch := refName[len("refs/heads/"):]
 
-	// 해당 브랜치로 checkout
+	// Check out the resulting branch.
 	checkout := exec.Command("git", "checkout", "-b", branch, commitHash)
 	checkout.Dir = repoPath
 	return checkout.Run()
