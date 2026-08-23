@@ -1,3 +1,8 @@
+// Package app implements the high-level init/push/pull workflows that tie
+// together local git history (internal/git), content storage (internal/ipfs),
+// and on-chain commit records (internal/chain). It depends on the small
+// ChainClient/IPFSClient interfaces defined below rather than the concrete
+// clients so tests can inject fakes instead of dialing a real chain or node.
 package app
 
 import (

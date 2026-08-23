@@ -11,6 +11,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// remoteCmd groups subcommands for managing the bit://<network>/<registry>/<repoId>
+// remotes recorded in .bit/config.json.
 var remoteCmd = &cobra.Command{
 	Use:   "remote",
 	Short: "Manage remotes",
@@ -18,18 +20,18 @@ var remoteCmd = &cobra.Command{
 
 var remoteAddCmd = &cobra.Command{
 	Use:   "add <name> <url>",
-	Short: "Add a new remote (예: bit remote add origin bit://sepolia/0xABC.../1)",
-	Args:  cobra.ExactArgs(2),
+	Short: "Add a new remote (e.g. bit remote add origin bit://sepolia/0xABC.../1)",
+	Args:  argsWithUsage(cobra.ExactArgs(2)),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name, url := args[0], args[1]
 
 		parsed, err := parseRemoteURL(url)
 		if err != nil {
-			return fmt.Errorf("URL 형식 오류: %w", err)
+			return fmt.Errorf("invalid URL format: %w", err)
 		}
 		cfg, err := config.Load(".")
 		if err != nil {
-			return fmt.Errorf("config 읽기 실패 (.bit/config.json): %w", err)
+			return fmt.Errorf("config read failed (.bit/config.json): %w", err)
 		}
 		if !strings.EqualFold(parsed.ContractAddress, cfg.ContractAddress) {
 			return fmt.Errorf("remote contract %s does not match configured contract %s", parsed.ContractAddress, cfg.ContractAddress)
@@ -43,15 +45,16 @@ var remoteAddCmd = &cobra.Command{
 		}
 		cfg.Remotes[name] = remote
 		if err := config.Save(".", cfg); err != nil {
-			return fmt.Errorf("remote 저장 실패: %w", err)
+			return fmt.Errorf("failed to save remote: %w", err)
 		}
 
-		fmt.Printf("remote '%s' 추가 완료 (repoId: %d)\n", name, parsed.RepoID)
+		fmt.Printf("added remote '%s' (repoId: %d)\n", name, parsed.RepoID)
 		return nil
 	},
 }
 
-// parseRepoID는 bit://<network>/<registry>/<repoId> 에서 repoId를 추출한다.
+// parsedRemote holds the components of a bit:// remote URL:
+// bit://<network>/<registry-contract-address>/<repoId>
 type parsedRemote struct {
 	Network         string
 	ContractAddress string
@@ -62,16 +65,16 @@ func parseRemoteURL(rawURL string) (*parsedRemote, error) {
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil || parsedURL.Scheme != "bit" || parsedURL.Host == "" || parsedURL.User != nil ||
 		parsedURL.RawQuery != "" || parsedURL.ForceQuery || parsedURL.Fragment != "" || strings.Contains(parsedURL.Host, ":") {
-		return nil, fmt.Errorf("올바른 형식: bit://<network>/<registry>/<repoId>")
+		return nil, fmt.Errorf("expected format: bit://<network>/<registry>/<repoId>")
 	}
 	parts := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
 	if len(parts) != 2 || !common.IsHexAddress(parts[0]) {
-		return nil, fmt.Errorf("올바른 형식: bit://<network>/<registry>/<repoId>")
+		return nil, fmt.Errorf("expected format: bit://<network>/<registry>/<repoId>")
 	}
 	repoIDStr := parts[1]
 	repoID, err := strconv.ParseUint(repoIDStr, 10, 64)
 	if err != nil || repoID == 0 {
-		return nil, fmt.Errorf("repoId는 1 이상의 숫자여야 합니다: %s", repoIDStr)
+		return nil, fmt.Errorf("repoId must be a number >= 1: %s", repoIDStr)
 	}
 	return &parsedRemote{Network: parsedURL.Host, ContractAddress: common.HexToAddress(parts[0]).Hex(), RepoID: repoID}, nil
 }
@@ -79,7 +82,7 @@ func parseRemoteURL(rawURL string) (*parsedRemote, error) {
 func validateRemoteForConfig(remote config.Remote, cfg *config.Config) error {
 	parsed, err := parseRemoteURL(remote.URL)
 	if err != nil {
-		return fmt.Errorf("remote URL 형식 오류: %w", err)
+		return fmt.Errorf("invalid remote URL format: %w", err)
 	}
 	if parsed.RepoID != remote.RepoID {
 		return fmt.Errorf("remote repoId mismatch: URL=%d config=%d", parsed.RepoID, remote.RepoID)

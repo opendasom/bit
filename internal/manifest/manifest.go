@@ -1,3 +1,7 @@
+// Package manifest defines the JSON document that accompanies each commit
+// diff uploaded to IPFS. It carries the metadata (author, committer,
+// parents, tree hash) needed to deterministically rebuild the original Git
+// commit on pull, independent of any single git remote.
 package manifest
 
 import "encoding/json"

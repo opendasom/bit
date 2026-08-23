@@ -1,3 +1,8 @@
+// Package cid converts between IPFS CIDv0 strings and the raw 32-byte
+// sha2-256 digest they encode. Storing the digest on-chain instead of the
+// full base58btc string saves gas, since a Kubo CIDv0 is always a
+// 0x12 0x20-prefixed sha2-256 multihash; the digest is enough to
+// reconstruct the CID string later.
 package cid
 
 import (

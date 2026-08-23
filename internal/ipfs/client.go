@@ -1,3 +1,6 @@
+// Package ipfs provides a minimal HTTP client for uploading and downloading
+// content-addressed data to/from a Kubo IPFS node, used for storing commit
+// diffs, manifests, and repo metadata off-chain.
 package ipfs
 
 import (
@@ -12,8 +15,8 @@ import (
 	"time"
 )
 
-// Client는 IPFS HTTP API와 통신하는 클라이언트다.
-// apiURL: IPFS 노드 주소 (기본값: "http://localhost:5001")
+// Client talks to a Kubo IPFS node over its HTTP API.
+// apiURL is the IPFS node address (default: "http://localhost:5001").
 type Client struct {
 	apiURL          string
 	http            *http.Client
@@ -22,7 +25,7 @@ type Client struct {
 
 const MaxDownloadBytes int64 = 64 << 20
 
-// NewClient는 IPFS 클라이언트를 생성한다.
+// NewClient creates an IPFS client bound to the node at apiURL.
 func NewClient(apiURL string) *Client {
 	return &Client{
 		apiURL:          strings.TrimRight(apiURL, "/"),
@@ -33,9 +36,9 @@ func NewClient(apiURL string) *Client {
 	}
 }
 
-// Upload는 데이터를 IPFS에 업로드하고 CID 문자열을 반환한다.
-// multipart/form-data 형식으로 POST /api/v0/add를 호출한다.
-// 반환된 CID는 이후 Download 호출이나 온체인 기록에 사용된다.
+// Upload adds data to IPFS and returns its CID string, by POSTing
+// multipart/form-data to /api/v0/add. The returned CID is later used for
+// Download calls and for on-chain records.
 func (c *Client) Upload(data []byte) (string, error) {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
@@ -73,7 +76,7 @@ func (c *Client) Upload(data []byte) (string, error) {
 		return "", fmt.Errorf("ipfs add response exceeds maximum size of %d bytes", 64*1024)
 	}
 
-	// 응답 JSON에서 CID(Hash 필드) 추출
+	// Extract the CID (the Hash field) from the response JSON.
 	var result struct {
 		Hash string `json:"Hash"`
 	}
@@ -86,8 +89,8 @@ func (c *Client) Upload(data []byte) (string, error) {
 	return result.Hash, nil
 }
 
-// Download는 CID로 IPFS에서 데이터를 다운로드한다.
-// POST /api/v0/cat?arg=<cid>를 호출해 원본 바이트를 반환한다.
+// Download fetches data from IPFS by CID, by POSTing to
+// /api/v0/cat?arg=<cid>, and returns the raw bytes.
 func (c *Client) Download(cid string) ([]byte, error) {
 	resp, err := c.http.Post(
 		fmt.Sprintf("%s/api/v0/cat?arg=%s", c.apiURL, url.QueryEscape(cid)),

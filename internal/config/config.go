@@ -1,3 +1,5 @@
+// Package config reads and writes the per-repository settings stored at
+// .bit/config.json, including RPC/IPFS endpoints and registered remotes.
 package config
 
 import (
@@ -10,30 +12,30 @@ import (
 const configDir = ".bit"
 const configFile = "config.json"
 
-// Remote는 bit remote add로 등록한 원격 저장소 정보를 담는다.
+// Remote holds the information for a remote registered via `bit remote add`.
 type Remote struct {
 	URL             string `json:"url"`                       // bit://<network>/<registry>/<repoId>
 	Network         string `json:"network,omitempty"`         // remote network label
 	ContractAddress string `json:"contractAddress,omitempty"` // remote registry address
-	RepoID          uint64 `json:"repoId"`                    // 체인에서 발급된 저장소 ID
+	RepoID          uint64 `json:"repoId"`                    // repo ID assigned by the chain
 }
 
-// Config는 .bit/config.json에 저장되는 프로젝트 설정이다.
+// Config is the per-project settings persisted at .bit/config.json.
 type Config struct {
-	RPCURL          string            `json:"rpcURL"`               // 이더리움 노드 주소
-	ContractAddress string            `json:"contractAddress"`      // BitRegistry 컨트랙트 주소
+	RPCURL          string            `json:"rpcURL"`               // Ethereum node address
+	ContractAddress string            `json:"contractAddress"`      // BitRegistry contract address
 	PrivateKey      string            `json:"privateKey,omitempty"` // legacy only; never written by Save
-	IPFSURL         string            `json:"ipfsURL"`              // IPFS 노드 주소
-	RepoID          uint64            `json:"repoId"`               // 체인에서 발급된 저장소 ID
-	Remotes         map[string]Remote `json:"remotes"`              // remote 이름 → Remote 정보
+	IPFSURL         string            `json:"ipfsURL"`              // IPFS node address
+	RepoID          uint64            `json:"repoId"`               // repo ID assigned by the chain
+	Remotes         map[string]Remote `json:"remotes"`              // remote name -> Remote info
 }
 
-// configPath는 .bit/config.json 경로를 반환한다.
+// configPath returns the path to .bit/config.json under repoPath.
 func configPath(repoPath string) string {
 	return filepath.Join(repoPath, configDir, configFile)
 }
 
-// Load는 .bit/config.json을 읽어 Config를 반환한다.
+// Load reads .bit/config.json and returns the resulting Config.
 func Load(repoPath string) (*Config, error) {
 	data, err := os.ReadFile(configPath(repoPath))
 	if err != nil {
@@ -49,7 +51,8 @@ func Load(repoPath string) (*Config, error) {
 	return &cfg, nil
 }
 
-// Save는 Config를 .bit/config.json에 저장한다.
+// Save atomically writes Config to .bit/config.json, stripping any
+// legacy PrivateKey field so it is never persisted to disk.
 func Save(repoPath string, cfg *Config) error {
 	dir := filepath.Join(repoPath, configDir)
 	if err := os.MkdirAll(dir, 0700); err != nil {
@@ -110,7 +113,7 @@ func EnsureLocalExclude(repoPath string) error {
 	return err
 }
 
-// AddRemote는 config에 remote를 추가하고 저장한다.
+// AddRemote adds a remote to the config and saves it.
 func AddRemote(repoPath, name string, remote Remote) error {
 	cfg, err := Load(repoPath)
 	if err != nil {
