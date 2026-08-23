@@ -17,8 +17,10 @@ import (
 // uploads repo metadata to IPFS, registers a new repo on-chain, and writes
 // the resulting repo ID and connection settings to .bit/config.json.
 var initCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Initialize a new bit repository",
+	Use:     "init",
+	Short:   "Initialize a new bit repository",
+	Args:    argsWithUsage(cobra.NoArgs),
+	PreRunE: requiredFlagsUsage,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		rpcURL, _ := cmd.Flags().GetString("rpc")
 		contractAddress, _ := cmd.Flags().GetString("contract")
@@ -30,7 +32,7 @@ var initCmd = &cobra.Command{
 
 		// 1. Verify .git exists (git init must have been run already)
 		if _, err := os.Stat(".git"); os.IsNotExist(err) {
-			return fmt.Errorf(".git 디렉토리가 없습니다. 먼저 git init을 실행하세요")
+			return fmt.Errorf(".git directory not found; run git init first")
 		}
 		if repoName == "" {
 			repoName = filepath.Base(mustGetwd())
@@ -43,7 +45,7 @@ var initCmd = &cobra.Command{
 			return err
 		}
 		if err := config.EnsureLocalExclude("."); err != nil {
-			return fmt.Errorf(".bit Git 제외 설정 실패: %w", err)
+			return fmt.Errorf("failed to configure .bit exclude: %w", err)
 		}
 
 		metadata := &repo.Metadata{
@@ -55,7 +57,7 @@ var initCmd = &cobra.Command{
 
 		chainClient, err := chain.NewClient(rpcURL, contractAddress, privateKey)
 		if err != nil {
-			return fmt.Errorf("체인 연결 실패: %w", err)
+			return fmt.Errorf("chain connection failed: %w", err)
 		}
 		defer chainClient.Close()
 		ipfsClient := ipfs.NewClient(ipfsURL)
@@ -64,8 +66,8 @@ var initCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("체인 저장소 생성 완료 (repoId: %s)\n", repoID.String())
-		fmt.Printf("repo metadata 등록 완료: %s\n", metadataCID)
+		fmt.Printf("created chain repo (repoId: %s)\n", repoID.String())
+		fmt.Printf("registered repo metadata: %s\n", metadataCID)
 
 		// Write .bit/config.json
 		cfg := &config.Config{
@@ -76,22 +78,22 @@ var initCmd = &cobra.Command{
 			RepoID:          repoID.Uint64(),
 		}
 		if err := config.Save(".", cfg); err != nil {
-			return fmt.Errorf("config 저장 실패: %w", err)
+			return fmt.Errorf("config save failed: %w", err)
 		}
-		fmt.Println("config 저장 완료 (.bit/config.json)")
+		fmt.Println("config saved (.bit/config.json)")
 
 		return nil
 	},
 }
 
 func init() {
-	initCmd.Flags().String("rpc", "", "이더리움 RPC URL (예: https://mainnet.infura.io/v3/...)")
-	initCmd.Flags().String("contract", "", "BitRegistry 컨트랙트 주소")
-	initCmd.Flags().String("key", "", "deprecated: 지갑 개인키; BIT_PRIVATE_KEY 환경변수 사용 권장")
-	initCmd.Flags().String("ipfs", "http://localhost:5001", "IPFS 노드 주소")
-	initCmd.Flags().String("name", "", "웹에 표시할 저장소 이름 (기본값: 현재 디렉토리명)")
-	initCmd.Flags().String("description", "", "웹에 표시할 저장소 설명")
-	initCmd.Flags().String("branch", "main", "웹에서 기본으로 조회할 브랜치")
+	initCmd.Flags().String("rpc", "", "Ethereum RPC URL (e.g. https://mainnet.infura.io/v3/...)")
+	initCmd.Flags().String("contract", "", "BitRegistry contract address")
+	initCmd.Flags().String("key", "", "deprecated: wallet private key; prefer the BIT_PRIVATE_KEY environment variable")
+	initCmd.Flags().String("ipfs", "http://localhost:5001", "IPFS node address")
+	initCmd.Flags().String("name", "", "repo name to display on the web (default: current directory name)")
+	initCmd.Flags().String("description", "", "repo description to display on the web")
+	initCmd.Flags().String("branch", "main", "default branch to show on the web")
 
 	initCmd.MarkFlagRequired("rpc")
 	initCmd.MarkFlagRequired("contract")

@@ -44,7 +44,7 @@ func TestPullRejectsBranchNeverPushed(t *testing.T) {
 	}
 
 	err := Pull(chainClient, newFakeIPFSClient(), dst, big.NewInt(1), "main")
-	if err == nil || !strings.Contains(err.Error(), "push된 적 없습니다") {
+	if err == nil || !strings.Contains(err.Error(), "has not been pushed yet") {
 		t.Fatalf("expected 'never pushed' error, got: %v", err)
 	}
 }
@@ -73,7 +73,7 @@ func TestPullRejectsDivergedLocalHead(t *testing.T) {
 	runGit(t, dst, "commit", "-m", "unrelated local commit")
 
 	err := Pull(chainClient, ipfsClient, dst, big.NewInt(1), "main")
-	if err == nil || !strings.Contains(err.Error(), "히스토리에 없습니다") {
+	if err == nil || !strings.Contains(err.Error(), "is not in remote branch") {
 		t.Fatalf("expected diverged-history error, got: %v", err)
 	}
 }

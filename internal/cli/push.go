@@ -17,18 +17,18 @@ import (
 var pushCmd = &cobra.Command{
 	Use:   "push <remote>",
 	Short: "Push current branch to remote",
-	Args:  cobra.ExactArgs(1),
+	Args:  argsWithUsage(cobra.ExactArgs(1)),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		remoteName := args[0]
 
 		cfg, err := config.Load(".")
 		if err != nil {
-			return fmt.Errorf("config 읽기 실패 (.bit/config.json): %w", err)
+			return fmt.Errorf("config read failed (.bit/config.json): %w", err)
 		}
 
 		remote, ok := cfg.Remotes[remoteName]
 		if !ok {
-			return fmt.Errorf("remote '%s' 를 찾을 수 없습니다", remoteName)
+			return fmt.Errorf("remote '%s' not found", remoteName)
 		}
 		if err := validateRemoteForConfig(remote, cfg); err != nil {
 			return err
@@ -41,7 +41,7 @@ var pushCmd = &cobra.Command{
 
 		chainClient, err := chain.NewClient(cfg.RPCURL, cfg.ContractAddress, privateKey)
 		if err != nil {
-			return fmt.Errorf("체인 연결 실패: %w", err)
+			return fmt.Errorf("chain connection failed: %w", err)
 		}
 		defer chainClient.Close()
 		ipfsClient := ipfs.NewClient(cfg.IPFSURL)

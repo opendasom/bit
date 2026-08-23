@@ -90,7 +90,7 @@ func (oversizedHistoryChainFake) GetBranchHistoryLength(*big.Int, string) (*big.
 
 func TestPullRejectsOversizedHistoryLength(t *testing.T) {
 	err := Pull(oversizedHistoryChainFake{}, pullIPFSFake{}, t.TempDir(), big.NewInt(1), "main")
-	if err == nil || !strings.Contains(err.Error(), "지원 범위") {
+	if err == nil || !strings.Contains(err.Error(), "out of the supported range") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

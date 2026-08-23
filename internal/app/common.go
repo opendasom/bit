@@ -20,10 +20,10 @@ func loadBranchRecords(chainClient ChainClient, repoID *big.Int, branch string, 
 		}
 		page, err := chainClient.GetBranchCommitsWithMetadata(repoID, branch, big.NewInt(int64(start)), big.NewInt(int64(limit)))
 		if err != nil {
-			return nil, fmt.Errorf("브랜치 히스토리 페이지 조회 실패 (%d..%d): %w", start, start+limit, err)
+			return nil, fmt.Errorf("branch history page lookup failed (%d..%d): %w", start, start+limit, err)
 		}
 		if len(page) != limit {
-			return nil, fmt.Errorf("브랜치 히스토리 페이지 길이 불일치 (%d..%d): got %d, want %d", start, start+limit, len(page), limit)
+			return nil, fmt.Errorf("branch history page length mismatch (%d..%d): got %d, want %d", start, start+limit, len(page), limit)
 		}
 		records = append(records, page...)
 	}

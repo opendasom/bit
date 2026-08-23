@@ -133,7 +133,7 @@ func CurrentBranch(repoPath string) (string, error) {
 	}
 	branch := strings.TrimSpace(string(out))
 	if branch == "" {
-		return "", errors.New("현재 브랜치를 확인할 수 없습니다")
+		return "", errors.New("failed to determine current branch")
 	}
 	return branch, nil
 }

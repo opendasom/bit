@@ -24,17 +24,17 @@ type pendingCommit struct {
 func Pull(chainClient ChainClient, ipfsClient IPFSClient, repoPath string, repoID *big.Int, branch string) error {
 	historyLen, err := chainClient.GetBranchHistoryLength(repoID, branch)
 	if err != nil {
-		return fmt.Errorf("브랜치 히스토리 조회 실패: %w", err)
+		return fmt.Errorf("branch history lookup failed: %w", err)
 	}
 	if historyLen.Sign() == 0 {
-		return fmt.Errorf("브랜치 '%s' 가 아직 push된 적 없습니다", branch)
+		return fmt.Errorf("branch '%s' has not been pushed yet", branch)
 	}
 	if historyLen.Sign() < 0 || !historyLen.IsInt64() || historyLen.BitLen() > 63 {
-		return fmt.Errorf("브랜치 히스토리 길이가 지원 범위를 벗어났습니다: %s", historyLen.String())
+		return fmt.Errorf("branch history length is out of the supported range: %s", historyLen.String())
 	}
 	total := historyLen.Int64()
 	if int64(int(total)) != total {
-		return fmt.Errorf("브랜치 히스토리 길이가 로컬 플랫폼 범위를 벗어났습니다: %s", historyLen.String())
+		return fmt.Errorf("branch history length exceeds this platform's int range: %s", historyLen.String())
 	}
 	records, err := loadBranchRecords(chainClient, repoID, branch, int(total))
 	if err != nil {
@@ -45,7 +45,7 @@ func Pull(chainClient ChainClient, ipfsClient IPFSClient, repoPath string, repoI
 	if git.HasHead(repoPath) {
 		localHead, err := git.CurrentHead(repoPath)
 		if err != nil {
-			return fmt.Errorf("로컬 HEAD 조회 실패: %w", err)
+			return fmt.Errorf("local HEAD lookup failed: %w", err)
 		}
 		found := false
 		for i, record := range records {
@@ -56,7 +56,7 @@ func Pull(chainClient ChainClient, ipfsClient IPFSClient, repoPath string, repoI
 			}
 		}
 		if !found {
-			return fmt.Errorf("로컬 HEAD %s 는 원격 브랜치 '%s' 히스토리에 없습니다", localHead[:8], branch)
+			return fmt.Errorf("local HEAD %s is not in remote branch '%s' history", localHead[:8], branch)
 		}
 	}
 	if start >= len(records) {
@@ -75,11 +75,11 @@ func Pull(chainClient ChainClient, ipfsClient IPFSClient, repoPath string, repoI
 
 		manifestData, err := ipfsClient.Download(manifestCID)
 		if err != nil {
-			return fmt.Errorf("manifest 다운로드 실패 (%s): %w", manifestCID, err)
+			return fmt.Errorf("manifest download failed (%s): %w", manifestCID, err)
 		}
 		m, err := manifest.Decode(manifestData)
 		if err != nil {
-			return fmt.Errorf("manifest 파싱 실패 (%s): %w", manifestCID, err)
+			return fmt.Errorf("manifest parse failed (%s): %w", manifestCID, err)
 		}
 
 		expectedCommit := chain.Bytes20ToGitHash(record.CommitHash)
@@ -108,24 +108,24 @@ func Pull(chainClient ChainClient, ipfsClient IPFSClient, repoPath string, repoI
 
 		diff, err := ipfsClient.Download(diffCID)
 		if err != nil {
-			return fmt.Errorf("diff 다운로드 실패 (%s): %w", m.DiffCID, err)
+			return fmt.Errorf("diff download failed (%s): %w", m.DiffCID, err)
 		}
 		pending = append(pending, pendingCommit{record: record, manifest: m, diff: diff})
 	}
 
-	fmt.Printf("브랜치: %s, 검증된 커밋: %d개\n", branch, len(pending))
+	fmt.Printf("branch: %s, verified commits: %d\n", branch, len(pending))
 	for _, item := range pending {
 		expectedCommit := chain.Bytes20ToGitHash(item.record.CommitHash)
 		if _, err := git.BuildCommitDiff(repoPath, item.manifest, item.diff); err != nil {
-			return fmt.Errorf("commit diff 재구성 실패 (%s): %w", expectedCommit, err)
+			return fmt.Errorf("commit diff reconstruction failed (%s): %w", expectedCommit, err)
 		}
-		fmt.Printf("commit 검증 완료: %s diff=%s\n", expectedCommit[:8], item.manifest.DiffCID)
+		fmt.Printf("verified commit: %s diff=%s\n", expectedCommit[:8], item.manifest.DiffCID)
 	}
 	finalCommit := chain.Bytes20ToGitHash(pending[len(pending)-1].record.CommitHash)
 	if err := git.CheckoutBranch(repoPath, branch, finalCommit); err != nil {
-		return fmt.Errorf("브랜치 전환 실패 (%s): %w", branch, err)
+		return fmt.Errorf("branch checkout failed (%s): %w", branch, err)
 	}
 
-	fmt.Printf("pull 완료: %s\n", branch)
+	fmt.Printf("pull complete: %s\n", branch)
 	return nil
 }
