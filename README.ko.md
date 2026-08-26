@@ -34,7 +34,7 @@ Bit은 IPFS와 Ethereum 위에서 동작하는 실험적인 분산 버전 관리
 
 <hr>
 
-## 아키텍처
+## 아키텍처 🏗️
 
 | 계층 | 역할 |
 |---|---|
@@ -49,7 +49,7 @@ Bit은 IPFS와 Ethereum 위에서 동작하는 실험적인 분산 버전 관리
 
 무결성 검증, 온체인 레코드, 역할, 프로토콜 제약은 [아키텍처와 데이터 모델 Wiki](https://github.com/opendasom/bit/wiki/Architecture-and-Data-Model)에서 확인할 수 있습니다.
 
-### 웹 Explorer
+### 웹 Explorer 🌐
 
 배포된 [Bit Web3 Explorer](https://bitweb.space/)에서 저장소를 조회하고 레지스트리 작업에 서명할 수 있습니다.
 
@@ -99,7 +99,7 @@ go build -o bit ./cmd/bit
 
 로컬 환경에서 Anvil과 IPFS를 시작하고, `BitRegistry`를 배포한 다음 저장소 생성·Push·Clone 검증까지 진행하려면 [Quick Start 가이드](https://github.com/opendasom/bit/wiki/Quick-Start)를 따르세요.
 
-## 문서
+## 문서 📚
 
 | 필요한 내용 | 가이드 |
 |---|---|
@@ -111,7 +111,7 @@ go build -o bit ./cmd/bit
 | 테스트, ABI 워크플로, 코드 구조 | [Development Guide](https://github.com/opendasom/bit/wiki/Development-Guide) |
 | 설정과 명령 실행 문제 | [Troubleshooting](https://github.com/opendasom/bit/wiki/Troubleshooting) |
 
-## 기여와 보안
+## 기여와 보안 🤝
 
 Pull Request를 열기 전에 [CONTRIBUTING.md](CONTRIBUTING.md)를 확인하세요. 관리자가 별도로 요청하지 않는 한 모든 Pull Request는 `develop` 브랜치를 대상으로 합니다. 취약점은 공개 Issue가 아닌 [SECURITY.md](SECURITY.md)를 통해 제보하세요.
 
