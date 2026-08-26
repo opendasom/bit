@@ -1,6 +1,4 @@
-// Package ipfs provides a minimal HTTP client for uploading and downloading
-// content-addressed data to/from a Kubo IPFS node, used for storing commit
-// diffs, manifests, and repo metadata off-chain.
+// Package ipfs provides a Kubo HTTP client.
 package ipfs
 
 import (
@@ -15,8 +13,7 @@ import (
 	"time"
 )
 
-// Client talks to a Kubo IPFS node over its HTTP API.
-// apiURL is the IPFS node address (default: "http://localhost:5001").
+// Client talks to a Kubo IPFS node over HTTP.
 type Client struct {
 	apiURL          string
 	http            *http.Client
@@ -25,7 +22,6 @@ type Client struct {
 
 const MaxDownloadBytes int64 = 64 << 20
 
-// NewClient creates an IPFS client bound to the node at apiURL.
 func NewClient(apiURL string) *Client {
 	return &Client{
 		apiURL:          strings.TrimRight(apiURL, "/"),
@@ -36,9 +32,6 @@ func NewClient(apiURL string) *Client {
 	}
 }
 
-// Upload adds data to IPFS and returns its CID string, by POSTing
-// multipart/form-data to /api/v0/add. The returned CID is later used for
-// Download calls and for on-chain records.
 func (c *Client) Upload(data []byte) (string, error) {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
@@ -76,7 +69,6 @@ func (c *Client) Upload(data []byte) (string, error) {
 		return "", fmt.Errorf("ipfs add response exceeds maximum size of %d bytes", 64*1024)
 	}
 
-	// Extract the CID (the Hash field) from the response JSON.
 	var result struct {
 		Hash string `json:"Hash"`
 	}
@@ -89,8 +81,6 @@ func (c *Client) Upload(data []byte) (string, error) {
 	return result.Hash, nil
 }
 
-// Download fetches data from IPFS by CID, by POSTing to
-// /api/v0/cat?arg=<cid>, and returns the raw bytes.
 func (c *Client) Download(cid string) ([]byte, error) {
 	resp, err := c.http.Post(
 		fmt.Sprintf("%s/api/v0/cat?arg=%s", c.apiURL, url.QueryEscape(cid)),
