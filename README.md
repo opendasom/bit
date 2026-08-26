@@ -64,7 +64,7 @@ Explore repositories and sign registry operations at the deployed [Bit Web3 expl
   </tr>
 </table>
 
-## Demos
+## Bit CLI Demos
 
 <table>
   <tr>
