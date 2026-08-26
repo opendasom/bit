@@ -40,7 +40,7 @@ Bit stores source history in a content-addressed form without relying on a centr
 |---|---|
 | **Git client** | Create familiar Git repositories and commits locally, then synchronize remote state with the `bit` CLI. |
 | **IPFS** | Store and replicate diffs, manifests, and repository metadata as content-addressed objects. |
-| **Ethereum** | Record repository state, branch heads, commit CIDs, and roles in `BitRegistry`. |
+| **Ethereum** | Record repository state, Git commit-based branch heads, manifest/diff CID digests, and repository roles in `BitRegistry`. |
 | **Web explorer** | Use [`bit-w3`](https://github.com/opendasom/bit-w3) to inspect IPFS and chain state and sign fork, role, and pull-request operations with MetaMask. |
 
 ## Demos
@@ -66,7 +66,7 @@ Bit stores source history in a content-addressed form without relying on a centr
 
 Prerequisites:
 
-- Go 1.25+ (the `go.mod` toolchain directive selects the verified version)
+- Go 1.25 language level; `go.mod` selects the Go 1.26.6 toolchain
 - An IPFS daemon such as Kubo (`ipfs daemon`)
 - Access to an Ethereum node, such as local Anvil or Sepolia
 - Foundry 1.7.1+ (`anvil`, `forge`) for local-chain and contract development (optional)
@@ -125,7 +125,7 @@ The seed command uses four default Anvil accounts and must run against an empty 
 
 ```bash
 mkdir my-project && cd my-project
-git init
+git init -b main
 
 export BIT_PRIVATE_KEY=ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 bit init \

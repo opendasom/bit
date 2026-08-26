@@ -40,7 +40,7 @@ IPFS와 이더리움 위에서 동작하는 실험적 분산 버전 관리 프�
 |---|---|
 | **Git client** | 익숙한 Git 저장소와 커밋을 로컬에서 생성하고, `bit` CLI로 원격 상태와 동기화합니다. |
 | **IPFS** | diff, manifest, repository metadata를 content-addressed 객체로 저장하고 복제합니다. |
-| **Ethereum** | `BitRegistry`가 repository·branch head·commit CID·역할을 기록해 상태와 권한을 검증합니다. |
+| **Ethereum** | `BitRegistry`가 저장소 상태, Git 커밋 해시 기반 브랜치 HEAD, Manifest·Diff CID digest 및 사용자 역할을 기록합니다. |
 | **Web explorer** | [`bit-w3`](https://github.com/opendasom/bit-w3)에서 IPFS와 체인 상태를 읽고, MetaMask 서명으로 fork·역할·PR 작업을 수행합니다. |
 
 ## 데모
@@ -66,7 +66,7 @@ IPFS와 이더리움 위에서 동작하는 실험적 분산 버전 관리 프�
 
 **사전 조건**
 
-- Go 1.25+ (`go.mod`의 toolchain 설정이 검증된 Go 버전을 선택합니다)
+- Go 1.25 언어 버전을 사용하며, `go.mod`의 `toolchain` 설정이 Go 1.26.6을 선택합니다.
 - Foundry 1.7.1+ (`anvil`, `forge`) — 로컬 체인 및 컨트랙트 배포용 (선택)
 - Node.js 20.19+ — 컨트랙트 ABI 아티팩트 생성용 (선택)
 - IPFS 데몬 (Kubo) — `ipfs daemon`
@@ -129,7 +129,7 @@ README에 나온 private key는 Anvil의 공개된 **로컬 테스트 전용** �
 
 ```bash
 mkdir my-project && cd my-project
-git init
+git init -b main
 
 export BIT_PRIVATE_KEY=ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 bit init \

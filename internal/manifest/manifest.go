@@ -15,7 +15,8 @@ type Identity struct {
 	Date  string `json:"date"`
 }
 
-// Manifest contains the data needed to reproduce one commit.
+// Manifest is uploaded to IPFS. The chain stores its CID digest in the commit
+// record; branch heads store Git commit hashes.
 type Manifest struct {
 	Version       int      `json:"version"`
 	Storage       string   `json:"storage"`
