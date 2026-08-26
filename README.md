@@ -47,6 +47,21 @@ Bit stores source history in a content-addressed form without relying on a centr
   <img src="docs/assets/bit-architecture.png" alt="Bit architecture showing participants, the local Git and CLI environment, IPFS, Ethereum, and the Web3 client" width="100%" />
 </p>
 
+### Web explorer
+
+Explore repositories and sign registry operations at the deployed [Bit Web3 explorer](https://bitweb.space/).
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/web-explorer-home.png" alt="Bit Web3 explorer landing page with Ethereum connection controls and a MetaMask connect button" /></td>
+    <td width="50%"><img src="docs/assets/web-explorer-pull-requests.png" alt="Bit Web3 explorer pull-request view with a pull request and signer authorization details" /></td>
+  </tr>
+  <tr>
+    <td align="center">Landing page</td>
+    <td align="center">Pull-request review</td>
+  </tr>
+</table>
+
 ## Demos
 
 <table>

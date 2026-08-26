@@ -47,6 +47,21 @@ IPFS와 이더리움 위에서 동작하는 실험적 분산 버전 관리 프�
   <img src="docs/assets/bit-architecture.png" alt="참여자, 로컬 Git·CLI 환경, IPFS, Ethereum 및 Web3 클라이언트의 연결을 보여 주는 Bit 아키텍처" width="100%" />
 </p>
 
+### 웹 explorer
+
+배포된 [Bit Web3 explorer](https://bitweb.space/)에서 저장소를 탐색하고 레지스트리 작업에 서명할 수 있습니다.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/web-explorer-home.png" alt="Ethereum 연결 제어와 MetaMask 연결 버튼이 있는 Bit Web3 explorer 랜딩 화면" /></td>
+    <td width="50%"><img src="docs/assets/web-explorer-pull-requests.png" alt="Pull Request와 서명 권한 정보를 보여 주는 Bit Web3 explorer 화면" /></td>
+  </tr>
+  <tr>
+    <td align="center">랜딩 화면</td>
+    <td align="center">Pull Request 검토</td>
+  </tr>
+</table>
+
 ## 데모
 
 <table>
