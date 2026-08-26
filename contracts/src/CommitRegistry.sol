@@ -288,7 +288,7 @@ abstract contract CommitRegistry is RepoRegistry {
         return repos[repoId].tags[tag];
     }
 
-    /// @dev Copies a commit (and its parents) between repos, refusing conflicting metadata.
+    /// @dev Rejects conflicting metadata while copying commit ancestry.
     function _copyCommitRecord(Repo storage sourceRepo, Repo storage targetRepo, bytes20 commitHash) internal {
         CommitRecord storage source = sourceRepo.commits[commitHash];
         if (!source.exists) revert CommitNotFound();

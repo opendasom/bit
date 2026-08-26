@@ -7,8 +7,7 @@ import (
 	"github.com/opendasom/bit/internal/repo"
 )
 
-// Init uploads repo metadata to IPFS and registers a new repo on-chain,
-// returning the newly assigned repo ID and the metadata's CID.
+// Init uploads metadata and registers the repository.
 func Init(chainClient ChainClient, ipfsClient IPFSClient, metadata *repo.Metadata) (*big.Int, string, error) {
 	metadataData, err := repo.EncodeMetadata(metadata)
 	if err != nil {

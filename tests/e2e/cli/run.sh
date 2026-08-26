@@ -1,19 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end test suite for the `bit` CLI (init / remote add / push / pull).
-#
-# Prerequisites (this script does NOT start them for you):
-#   - anvil running at $RPC_URL (default http://127.0.0.1:8545)
-#   - `ipfs daemon` running with its API at $IPFS_URL (default http://127.0.0.1:5001)
-#
-# Usage:
-#   ./tests/e2e/cli/run.sh              # run the standard case set
-#   RUN_SLOW=1 ./tests/e2e/cli/run.sh   # also run the slow/opt-in cases (e.g. pagination)
-#   KEEP_WORKDIR=1 ./tests/e2e/cli/run.sh  # keep the temp workspace for manual inspection after the run
-#
-# Each `bit init` deploys nothing itself, but every case that needs a repo
-# calls `bit init` against ONE contract deployed fresh at the top of this
-# run, so repoIds are shared and comparable across cases within a run but
-# never reused across separate runs of this script.
+# Requires a running Anvil node and IPFS daemon.
 
 set -uo pipefail
 
@@ -34,9 +20,6 @@ for f in "$SUITE_DIR"/cases/*.sh; do
   source "$f"
 done
 
-# Order matters only in that CAS/racing style cases (PUSH-1) create their
-# own isolated repos, so cases are independent and could run in any order -
-# this order just roughly follows the CLI command pipeline: init -> remote -> push -> pull.
 case_init_missing_git
 case_init_sequential_repo_ids
 

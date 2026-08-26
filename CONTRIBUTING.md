@@ -53,6 +53,7 @@ repository.
 
 ## Pull requests
 
-Use a concise title, explain the user-visible effect, and note validation you
-ran. Maintainers may request tests, documentation, or a compatibility note
-before merging.
+All pull requests should target the `develop` branch unless a maintainer
+specifically requests a different target. Use a concise title, explain the
+user-visible effect, and note validation you ran. Maintainers may request
+tests, documentation, or a compatibility note before merging.

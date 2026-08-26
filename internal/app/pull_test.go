@@ -65,8 +65,6 @@ func TestPullRejectsDivergedLocalHead(t *testing.T) {
 		},
 	}
 
-	// dst has its own unrelated history (a second commit on top of the same
-	// base), so its HEAD can't be found in the remote's recorded history.
 	dst := newTestRepo(t)
 	writeFile(t, dst, "unrelated.txt", "local-only work\n")
 	runGit(t, dst, "add", "unrelated.txt")
@@ -84,8 +82,7 @@ func TestPullRejectsManifestCommitMismatch(t *testing.T) {
 
 	ipfsClient := newFakeIPFSClient()
 	record := uploadCommitRecord(t, ipfsClient, src, "main", commitHash)
-	// Corrupt the on-chain record so it no longer matches the manifest
-	// that was actually uploaded (simulates a tampered/incorrect record).
+	// Simulate a tampered on-chain record.
 	record.CommitHash[0] ^= 0xFF
 
 	chainClient := &fakeChainClient{
@@ -120,7 +117,6 @@ func TestPullIsNoopWhenLocalHeadIsLatest(t *testing.T) {
 		},
 	}
 
-	// dst already has exactly the commit the remote knows about.
 	dst := src
 	if err := Pull(chainClient, ipfsClient, dst, big.NewInt(1), "main"); err != nil {
 		t.Fatalf("Pull failed: %v", err)

@@ -10,8 +10,7 @@ import (
 	"github.com/opendasom/bit/internal/manifest"
 )
 
-// Push uploads commits on the current local branch that are missing from
-// the remote's on-chain history, then records them on-chain.
+// Push uploads and records commits missing from the remote branch.
 func Push(chainClient ChainClient, ipfsClient IPFSClient, repoPath string, repoID *big.Int) error {
 	branch, err := git.CurrentBranch(repoPath)
 	if err != nil {

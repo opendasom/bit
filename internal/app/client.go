@@ -1,8 +1,4 @@
-// Package app implements the high-level init/push/pull workflows that tie
-// together local git history (internal/git), content storage (internal/ipfs),
-// and on-chain commit records (internal/chain). It depends on the small
-// ChainClient/IPFSClient interfaces defined below rather than the concrete
-// clients so tests can inject fakes instead of dialing a real chain or node.
+// Package app implements Bit's init, push, and pull workflows.
 package app
 
 import (
@@ -11,9 +7,7 @@ import (
 	"github.com/opendasom/bit/internal/chain"
 )
 
-// ChainClient is the subset of chain.Client's methods that app-level
-// commands depend on. Defining it here instead of depending on the concrete
-// *chain.Client type lets tests inject a fake instead of dialing a real chain.
+// ChainClient defines the contract operations used by workflows.
 type ChainClient interface {
 	GetBranchCommit(repoID *big.Int, branch string) ([20]byte, error)
 	GetBranchHistoryLength(repoID *big.Int, branch string) (*big.Int, error)
@@ -31,8 +25,7 @@ type ChainClient interface {
 	CreateRepo(metadataCID string) (*big.Int, error)
 }
 
-// IPFSClient is the subset of ipfs.Client's methods that app-level commands
-// depend on.
+// IPFSClient provides workflow content storage.
 type IPFSClient interface {
 	Upload(data []byte) (string, error)
 	Download(cid string) ([]byte, error)

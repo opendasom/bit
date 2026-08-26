@@ -11,9 +11,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// pushCmd implements `bit push <remote>`: it resolves the named remote and
-// signing key from .bit/config.json / BIT_PRIVATE_KEY, then delegates to
-// app.Push to upload and record any local commits missing on-chain.
 var pushCmd = &cobra.Command{
 	Use:   "push <remote>",
 	Short: "Push current branch to remote",
