@@ -15,8 +15,6 @@ import (
 	"github.com/opendasom/bit/internal/manifest"
 )
 
-// fakeChainClient implements ChainClient with per-method overrides so each
-// test only wires up the calls it actually exercises.
 type fakeChainClient struct {
 	getBranchCommit              func(repoID *big.Int, branch string) ([20]byte, error)
 	getBranchHistoryLength       func(repoID *big.Int, branch string) (*big.Int, error)
@@ -69,9 +67,7 @@ func (f *fakeChainClient) CreateRepo(metadataCID string) (*big.Int, error) {
 	return f.createRepo(metadataCID)
 }
 
-// fakeIPFSClient is an in-memory content store keyed by a real CIDv0
-// (sha2-256 of the uploaded bytes), so compactcid round-trips exactly like
-// they would against a real Kubo node.
+// fakeIPFSClient uses real CIDv0 values to match Kubo round trips.
 type fakeIPFSClient struct {
 	store     map[string][]byte
 	uploadErr error
@@ -99,7 +95,6 @@ func (f *fakeIPFSClient) Download(cidStr string) ([]byte, error) {
 	return data, nil
 }
 
-// newTestRepo creates a temp git repo on branch "main" with a single commit.
 func newTestRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -115,8 +110,6 @@ func newTestRepo(t *testing.T) string {
 	return dir
 }
 
-// newEmptyRepoDir creates a bare-uninitialized-HEAD git repo directory
-// suitable as a Pull destination.
 func newEmptyRepoDir(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -130,9 +123,6 @@ func newEmptyRepoDir(t *testing.T) string {
 	return dir
 }
 
-// uploadCommitRecord reads commitHash out of the repo at repoPath, uploads
-// its diff+manifest to ipfsClient, and returns the chain.BranchCommitRecord
-// a real push would have recorded for it.
 func uploadCommitRecord(t *testing.T, ipfsClient *fakeIPFSClient, repoPath, branch, commitHash string) chain.BranchCommitRecord {
 	t.Helper()
 	info, err := git.ReadCommit(repoPath, commitHash)

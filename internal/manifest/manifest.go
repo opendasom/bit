@@ -1,7 +1,4 @@
-// Package manifest defines the JSON document that accompanies each commit
-// diff uploaded to IPFS. It carries the metadata (author, committer,
-// parents, tree hash) needed to deterministically rebuild the original Git
-// commit on pull, independent of any single git remote.
+// Package manifest defines the commit metadata stored alongside diffs.
 package manifest
 
 import "encoding/json"
@@ -12,15 +9,14 @@ const (
 	DiffBinaryPatch   = "git diff --binary --full-index"
 )
 
-// Identity captures the metadata needed to rebuild the original Git commit.
 type Identity struct {
 	Name  string `json:"name"`
 	Email string `json:"email"`
 	Date  string `json:"date"`
 }
 
-// Manifest is uploaded to IPFS and its CID is recorded on-chain as the branch
-// head. Version 1 stores exactly one commit diff per manifest.
+// Manifest is uploaded to IPFS. The chain stores its CID digest in the commit
+// record; branch heads store Git commit hashes.
 type Manifest struct {
 	Version       int      `json:"version"`
 	Storage       string   `json:"storage"`

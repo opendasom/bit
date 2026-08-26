@@ -211,7 +211,7 @@ abstract contract PullRequestRegistry is CommitRegistry {
         }
     }
 
-    /// @dev Half-open range [start, end) of source branch history to fast-forward onto the target.
+    /// @dev Uses a half-open source-history range.
     function _getPullRequestCommitRange(
         Repo storage sourceRepo,
         bytes32 sourceBranch,

@@ -19,7 +19,7 @@ func TestPushRecordsNewCommitOnChain(t *testing.T) {
 	var recordedBranch string
 	chainClient := &fakeChainClient{
 		getBranchCommit: func(repoID *big.Int, branch string) ([20]byte, error) {
-			return [20]byte{}, nil // no prior push
+			return [20]byte{}, nil
 		},
 		recordCommit: func(repoID *big.Int, branch string, expectedOldCommit, commitHash, treeHash [20]byte, parentHashes [][20]byte, manifestDigest, diffDigest [32]byte) error {
 			recorded = true
@@ -64,19 +64,19 @@ func TestPushIsNoopWhenUpToDate(t *testing.T) {
 }
 
 func TestPushRejectsMergeCommit(t *testing.T) {
-	repoDir := newTestRepo(t) // commit A on main
+	repoDir := newTestRepo(t)
 
 	runGit(t, repoDir, "checkout", "-b", "feature")
 	writeFile(t, repoDir, "feature.txt", "feature work\n")
 	runGit(t, repoDir, "add", "feature.txt")
-	runGit(t, repoDir, "commit", "-m", "feature commit") // commit B
+	runGit(t, repoDir, "commit", "-m", "feature commit")
 
 	runGit(t, repoDir, "checkout", "main")
 	writeFile(t, repoDir, "main.txt", "main work\n")
 	runGit(t, repoDir, "add", "main.txt")
-	runGit(t, repoDir, "commit", "-m", "main commit") // commit C
+	runGit(t, repoDir, "commit", "-m", "main commit")
 
-	runGit(t, repoDir, "merge", "--no-ff", "-m", "merge feature", "feature") // commit M, 2 parents
+	runGit(t, repoDir, "merge", "--no-ff", "-m", "merge feature", "feature")
 
 	var recordCount int
 	chainClient := &fakeChainClient{
@@ -96,8 +96,7 @@ func TestPushRejectsMergeCommit(t *testing.T) {
 	if !strings.Contains(err.Error(), "merge commit") {
 		t.Fatalf("expected merge commit error, got: %v", err)
 	}
-	// A, C, and B precede the merge commit M in rev-list order; only they
-	// should have been recorded before Push stopped at M.
+	// Earlier non-merge commits are recorded before Push reaches the merge.
 	if recordCount != 3 {
 		t.Fatalf("expected 3 commits recorded before the merge commit halted push, got %d", recordCount)
 	}

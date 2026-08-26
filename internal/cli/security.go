@@ -9,11 +9,7 @@ import (
 	"github.com/opendasom/bit/internal/config"
 )
 
-// resolveSigningKey picks the private key to sign transactions with, in
-// order of preference: the --key flag, the BIT_PRIVATE_KEY environment
-// variable, then the legacy privateKey field in .bit/config.json. The flag
-// and legacy config paths are discouraged since they can leak the key
-// through shell history or a committed file.
+// --key warns about shell exposure; legacy config is a fallback.
 func resolveSigningKey(flagValue string, cfg *config.Config) (string, error) {
 	if key := strings.TrimSpace(flagValue); key != "" {
 		fmt.Fprintln(os.Stderr, "warning: --key can be exposed through shell history; prefer BIT_PRIVATE_KEY")

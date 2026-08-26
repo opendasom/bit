@@ -1,17 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end test cases for `bit pull`.
-
-# PULL-1: pulling into a brand-new (HEAD-less) repo reconstructs the exact
-# same commit hash git originally computed, not just "similar" content.
-#
-# `git.ApplyCommitDiff` (internal/git/reader.go) rebuilds each commit via
-# `git apply` -> `git write-tree` (checked against the manifest's TreeHash)
-# -> `git commit-tree` with the original author/committer identity and
-# dates replayed through GIT_AUTHOR_DATE / GIT_COMMITTER_DATE -> `git
-# reset --hard`. If any of that byte-reproduction is off, the resulting
-# commit hash will differ from what's on-chain and pull will simply never
-# succeed for that commit - so a passing pull is itself the strongest
-# evidence this machinery works.
+# End-to-end cases for `bit pull`.
 case_pull_fresh_clone_reconstructs_hash() {
   log_case "PULL-1: fresh clone reconstructs the exact original commit hash"
   local src dst repo_id
@@ -38,8 +26,6 @@ case_pull_fresh_clone_reconstructs_hash() {
   PULL_SRC="$src"; PULL_DST="$dst"; PULL_REPO_ID="$repo_id"
 }
 
-# PULL-2: pulling again after the remote gained more commits applies only
-# the new ones and picks up exactly where the last pull left off.
 case_pull_incremental() {
   log_case "PULL-2: a second pull only applies newly-pushed commits"
   local src dst repo_id
@@ -65,13 +51,7 @@ case_pull_incremental() {
   assert_eq "dst HEAD now matches src HEAD" "$(git_head "$src")" "$(git_head "$dst")"
 }
 
-# PULL-3: a local commit the remote never saw makes the repo "diverged",
-# and pull must refuse rather than silently rewriting local history.
-#
-# This is the single most safety-critical check in `bit pull`: if it were
-# missing, pull could discard a user's uncommitted-to-chain work with no
-# warning. Verified live: pull.go walks the whole remote history looking
-# for local HEAD and, if not found, exits 1 without touching the worktree.
+# Reject a divergent HEAD rather than overwrite local history.
 case_pull_diverged_head_rejected() {
   log_case "PULL-3: diverged local HEAD blocks pull instead of overwriting it"
   local src dst repo_id
@@ -99,8 +79,6 @@ case_pull_diverged_head_rejected() {
   assert_eq "local HEAD is untouched by the rejected pull" "$head_diverged" "$(git_head "$dst")"
 }
 
-# PULL-4: a dirty worktree blocks pull instead of clobbering uncommitted
-# local edits.
 case_pull_dirty_worktree_rejected() {
   log_case "PULL-4: uncommitted local changes block pull"
   local src dst repo_id
@@ -126,19 +104,7 @@ case_pull_dirty_worktree_rejected() {
   (cd "$dst" && git checkout -- f.txt)
 }
 
-# PULL-5: a tampered / inconsistent on-chain record is caught by the
-# 3-way manifest verification (commit hash, diff CID, tree hash), not
-# blindly applied.
-#
-# This bypasses `bit push` entirely and calls `recordCommit` directly via
-# `cast send`, reusing a REAL, already-uploaded manifestDigest/diffDigest
-# but attaching them to a fabricated commitHash/treeHash. This simulates
-# either outright tampering, or (more realistically) a bug elsewhere that
-# records mismatched metadata for a commit. `internal/app/pull.go` checks
-# `m.GitCommit == expectedCommit`, `m.DiffCID == diffCID` and
-# `m.TreeHash == expectedTreeHash` before ever calling `git apply` - this
-# proves that verification actually stops a bad record instead of just
-# looking like it would.
+# Verify metadata before applying a record injected outside the CLI.
 case_pull_tampered_chain_record_rejected() {
   log_case "PULL-5: pull rejects an on-chain record whose manifest doesn't match its claimed commit hash"
   local dir repo_id
@@ -157,8 +123,6 @@ case_pull_tampered_chain_record_rejected() {
       "$repo_id" "$head" --rpc-url "$RPC_URL" | tr '\n' ' '
   )
 
-  # Any syntactically valid 20-byte hash works here - it just needs to be
-  # different from the real commit hash whose manifest we're reusing.
   local fake_commit fake_tree
   fake_commit="0x$(echo fake-commit | git hash-object --stdin)"
   fake_tree="0x$(echo fake-tree | git hash-object --stdin)"
@@ -181,9 +145,6 @@ case_pull_tampered_chain_record_rejected() {
     "$head" "0x$(git_head "$puller")"
 }
 
-# PULL-6: pageSize=100 pagination boundary in loadBranchRecords
-# (internal/app/common.go). Slow (100+ pushed commits) - opt in with
-# RUN_SLOW=1.
 case_pull_pagination_boundary() {
   log_case "PULL-6: pull correctly pages through >100 commits (RUN_SLOW=1 only)"
   if [ "$RUN_SLOW" != "1" ]; then
@@ -212,13 +173,6 @@ case_pull_pagination_boundary() {
   assert_eq "final HEAD matches after paginated pull" "$(git_head "$src")" "$(git_head "$dst")"
 }
 
-# PULL-7: reproducing commit-tree hashes depends on replaying
-# GIT_AUTHOR_DATE / GIT_COMMITTER_DATE exactly (see internal/git/reader.go
-# ApplyCommitDiff). This is a real risk if push and pull happen on machines
-# with different $TZ, but isn't practically automatable in a single-host
-# script (both anvil and this suite run in one timezone) - left as a
-# manual check: run `bit push` on one machine, `bit pull` on another with a
-# different $TZ, and confirm the resulting commit hash still matches.
 case_pull_timezone_reproducibility_manual_note() {
   log_case "PULL-7: cross-timezone commit hash reproducibility (manual only)"
   log_skip "requires two machines/containers with different \$TZ - not automated here"

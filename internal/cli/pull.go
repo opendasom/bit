@@ -11,9 +11,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// pullCmd implements `bit pull <remote> <branch>`: it resolves the named
-// remote from .bit/config.json and delegates to app.Pull to fetch and
-// verify any commits missing from the local repository.
 var pullCmd = &cobra.Command{
 	Use:   "pull <remote> <branch>",
 	Short: "Pull branch from remote",

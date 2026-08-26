@@ -1,8 +1,4 @@
-// Package cid converts between IPFS CIDv0 strings and the raw 32-byte
-// sha2-256 digest they encode. Storing the digest on-chain instead of the
-// full base58btc string saves gas, since a Kubo CIDv0 is always a
-// 0x12 0x20-prefixed sha2-256 multihash; the digest is enough to
-// reconstruct the CID string later.
+// Package cid converts CIDv0 strings and their sha2-256 digests.
 package cid
 
 import (
@@ -24,7 +20,6 @@ func init() {
 	}
 }
 
-// DigestFromCIDV0 extracts the 32-byte sha2-256 digest from a Kubo default CIDv0.
 func DigestFromCIDV0(value string) ([32]byte, error) {
 	var digest [32]byte
 	raw, err := decodeBase58BTC(value)
@@ -38,7 +33,6 @@ func DigestFromCIDV0(value string) ([32]byte, error) {
 	return digest, nil
 }
 
-// CIDV0FromDigest reconstructs a CIDv0 string from a sha2-256 multihash digest.
 func CIDV0FromDigest(digest [32]byte) string {
 	raw := make([]byte, 34)
 	raw[0] = 0x12

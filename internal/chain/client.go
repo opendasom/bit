@@ -1,3 +1,4 @@
+// Package chain communicates with the BitRegistry contract.
 package chain
 
 import (
@@ -55,7 +56,7 @@ type RepoRecord struct {
 	MetadataCID string
 }
 
-// Client는 BitRegistry 스마트 컨트랙트와 통신하는 클라이언트다.
+// Client communicates with the BitRegistry contract.
 type Client struct {
 	contractAddress common.Address
 	contract        *bind.BoundContract
@@ -81,7 +82,6 @@ func loadArtifactABI() (abi.ABI, error) {
 	return artifactABI, artifactErr
 }
 
-// NewClient는 RPC 노드에 연결하고 개인키로 지갑을 초기화해 Client를 반환한다.
 func NewClient(rpcURL, contractAddress, privateKeyHex string) (*Client, error) {
 	client, err := newClient(rpcURL, contractAddress)
 	if err != nil {
@@ -166,7 +166,6 @@ func (c *Client) Close() {
 	}
 }
 
-// branchNameToBytes32는 브랜치명 문자열을 keccak256 해시한 [32]byte로 변환한다.
 func branchNameToBytes32(name string) [32]byte {
 	h := sha3.NewLegacyKeccak256()
 	h.Write([]byte(name))
@@ -231,7 +230,6 @@ func (c *Client) transact(method string, params ...interface{}) (*types.Transact
 	return c.contract.Transact(&auth, method, params...)
 }
 
-// GetBranchHead는 특정 브랜치의 현재 헤드 manifest CID를 체인에서 조회한다.
 func (c *Client) GetBranchHead(repoID *big.Int, branch string) (string, error) {
 	out, err := c.call("getBranchHead", repoID, branchNameToBytes32(branch))
 	if err != nil {
@@ -360,7 +358,6 @@ func (c *Client) RecordCommit(
 	return err
 }
 
-// CreateRepo는 체인에 새 저장소를 생성하고 repoId를 반환한다.
 func (c *Client) CreateRepo(metadataCID string) (*big.Int, error) {
 	tx, err := c.transact("createRepo", []byte(metadataCID))
 	if err != nil {
@@ -388,7 +385,6 @@ func (c *Client) CreateRepo(metadataCID string) (*big.Int, error) {
 	return nil, errors.New("RepoCreated event not found in transaction receipt")
 }
 
-// GetPublicAddress는 개인키로부터 지갑 주소를 계산해 반환한다.
 func GetPublicAddress(privateKeyHex string) (string, error) {
 	privateKeyHex = strings.TrimPrefix(privateKeyHex, "0x")
 	privKey, err := crypto.HexToECDSA(privateKeyHex)
