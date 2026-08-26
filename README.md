@@ -43,6 +43,10 @@ Bit stores source history in a content-addressed form without relying on a centr
 | **Ethereum** | Record repository state, Git commit-based branch heads, manifest/diff CID digests, and repository roles in `BitRegistry`. |
 | **Web explorer** | Use [`bit-w3`](https://github.com/opendasom/bit-w3) to inspect IPFS and chain state and sign fork, role, and pull-request operations with MetaMask. |
 
+<p align="center">
+  <img src="docs/assets/bit-architecture.png" alt="Bit architecture showing participants, the local Git and CLI environment, IPFS, Ethereum, and the Web3 client" width="100%" />
+</p>
+
 ## Demos
 
 <table>

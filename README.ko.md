@@ -43,6 +43,10 @@ IPFS와 이더리움 위에서 동작하는 실험적 분산 버전 관리 프�
 | **Ethereum** | `BitRegistry`가 저장소 상태, Git 커밋 해시 기반 브랜치 HEAD, Manifest·Diff CID digest 및 사용자 역할을 기록합니다. |
 | **Web explorer** | [`bit-w3`](https://github.com/opendasom/bit-w3)에서 IPFS와 체인 상태를 읽고, MetaMask 서명으로 fork·역할·PR 작업을 수행합니다. |
 
+<p align="center">
+  <img src="docs/assets/bit-architecture.png" alt="참여자, 로컬 Git·CLI 환경, IPFS, Ethereum 및 Web3 클라이언트의 연결을 보여 주는 Bit 아키텍처" width="100%" />
+</p>
+
 ## 데모
 
 <table>
