@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# End-to-end test cases for `bit remote add`.
-# These exercise parseRepoID (internal/cli/remote.go) purely through the CLI, by
-# inspecting what ends up in .bit/config.json.
+# End-to-end cases for `bit remote add`.
 
-# REMOTE-1: a well-formed URL is parsed and stored correctly.
 case_remote_add_ok() {
   log_case "REMOTE-1: well-formed bit:// URL is parsed and saved"
   local dir
@@ -16,14 +13,6 @@ case_remote_add_ok() {
   assert_eq "repoId 42 stored in config.json" "42" "$stored"
 }
 
-# REMOTE-2: a `#branch` fragment on the URL must be stripped from the
-# repoId, not parsed as part of the number.
-#
-# Why this matters: `bit://local/0xABC.../1#main` is a documented URL shape
-# (see CLAUDE.md). If the fragment leaked into the numeric parse, this
-# would fail loudly (good) - but if it silently truncated to the right
-# answer by luck for small numbers and broke only for larger ones, that's
-# a much nastier bug to catch later.
 case_remote_add_branch_fragment() {
   log_case "REMOTE-2: #branch fragment is stripped from repoId"
   local dir
@@ -35,8 +24,6 @@ case_remote_add_branch_fragment() {
   assert_eq "repoId 7 extracted, #main dropped" "7" "$stored"
 }
 
-# REMOTE-3: too few path segments must be rejected with a clear error
-# instead of a Go index-out-of-range panic.
 case_remote_add_too_few_segments() {
   log_case "REMOTE-3: malformed URL (too few segments) is rejected cleanly"
   local dir
@@ -49,7 +36,6 @@ case_remote_add_too_few_segments() {
   assert_contains "explains the expected URL shape" "$out" "bit://<network>/<registry>/<repoId>"
 }
 
-# REMOTE-4: a non-numeric repoId segment must be rejected cleanly.
 case_remote_add_non_numeric_repo_id() {
   log_case "REMOTE-4: non-numeric repoId is rejected cleanly"
   local dir
