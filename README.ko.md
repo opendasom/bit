@@ -34,6 +34,8 @@ IPFS와 이더리움 위에서 동작하는 실험적 분산 버전 관리 프�
 
 중앙 Git 서버 없이 코드 히스토리를 content-addressed 형태로 저장하고 누구나 검증할 수 있습니다. 온체인 레코드는 히스토리의 무결성을 검증할 수 있게 하지만, IPFS 데이터의 가용성은 핀(pin)과 복제 상태에 달려 있습니다. 중요한 데이터는 자체 IPFS 노드 또는 신뢰할 수 있는 pinning 서비스에 보관하세요.
 
+<hr>
+
 ## 핵심 구성
 
 | 계층 | Bit가 하는 일 |
@@ -81,6 +83,8 @@ IPFS와 이더리움 위에서 동작하는 실험적 분산 버전 관리 프�
   </tr>
 </table>
 
+<hr>
+
 ## 설치
 
 **사전 조건**
@@ -99,8 +103,6 @@ go build -o bit ./cmd/bit
 # 전역 명령어로 등록 (선택)
 sudo cp ./bit /usr/local/bin/bit
 ```
-
----
 
 ## 로컬 테스트 환경 구성
 
@@ -140,7 +142,7 @@ npm run anvil:seed
 시드 명령은 기본 Anvil 계정 4개를 사용하며 비어 있는 registry에서 한 번만 실행합니다.
 README에 나온 private key는 Anvil의 공개된 **로컬 테스트 전용** 키입니다. 어떤 테스트넷이나 메인넷에서도 사용하면 안 됩니다.
 
----
+<hr>
 
 ## 빠른 시작
 
@@ -226,7 +228,7 @@ npm run dev
 
 웹 관련 문서, 이슈, 보안 신고 및 기타 기여는 모두 이 `bit` 저장소에서 통합 관리합니다.
 
----
+<hr>
 
 ## 명령어 참조
 
@@ -281,8 +283,6 @@ bit clone <bit-url> [directory] --rpc <url> [--ipfs <url>] [--branch <branch>]
 - private key 없이 기존 repository를 복원합니다.
 - `origin` remote와 local config를 생성한 뒤 검증된 branch를 checkout합니다.
 
----
-
 ## 권한 모델 (BitRegistry)
 
 | Role | 권한 |
@@ -294,8 +294,6 @@ bit clone <bit-url> [directory] --rpc <url> [--ipfs <url>] [--branch <branch>]
 
 저장소 생성자는 Owner가 되며, Owner는 Maintainer 권한을 포함합니다.
 
----
-
 ## 현재 제약과 보안 경계
 
 - push와 merge는 linear history만 지원하며 merge commit은 거절됩니다.
@@ -304,8 +302,6 @@ bit clone <bit-url> [directory] --rpc <url> [--ipfs <url>] [--branch <branch>]
 - IPFS 데이터는 공개되어 있으며 암호화되지 않습니다. CID를 아는 사용자는 diff와 metadata를 읽을 수 있습니다.
 - CID의 지속적인 가용성은 하나 이상의 IPFS 노드가 데이터를 pin하고 제공하는지에 달려 있습니다.
 - protocol v2 client는 이전 BitRegistry 배포와 호환되지 않으며 연결 시 `PROTOCOL_VERSION`을 확인합니다.
-
----
 
 ## 검증
 
@@ -317,7 +313,7 @@ npm ci
 npm run compile
 ```
 
----
+<hr>
 
 ## 프로젝트 구조
 
@@ -344,8 +340,6 @@ bit/
 └── package.json              # CLI 호환 ABI 생성용 Node.js 패키지
 ```
 
----
-
 ## 주요 의존성
 
 | 패키지 | 용도 | 라이선스 |
@@ -354,8 +348,6 @@ bit/
 | `go-git/v5 v5.19.1` | Git 저장소 읽기 | Apache-2.0 |
 | `cobra v1.8.1` | CLI 프레임워크 | Apache-2.0 |
 | `golang.org/x/crypto v0.51.0` | 암호화 유틸리티 | BSD-3-Clause |
-
----
 
 ## 개발과 검증
 
@@ -370,8 +362,6 @@ npm run compile
 ```
 
 기여 방법은 [CONTRIBUTING.md](CONTRIBUTING.md), 취약점 신고는 [SECURITY.md](SECURITY.md)를 참고하세요.
-
----
 
 ## License
 

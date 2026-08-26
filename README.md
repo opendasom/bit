@@ -34,6 +34,8 @@ Bit is an experimental distributed version-control protocol built on IPFS and Et
 
 Bit stores source history in a content-addressed form without relying on a central Git server, allowing anyone to verify it. On-chain records protect history integrity, but IPFS availability depends on pinning and replication. Preserve important data on your own IPFS node or a trusted pinning service.
 
+<hr>
+
 ## Architecture
 
 | Layer | Responsibility |
@@ -80,6 +82,8 @@ Explore repositories and sign registry operations at the deployed [Bit Web3 expl
     </td>
   </tr>
 </table>
+
+<hr>
 
 ## Installation
 
@@ -137,6 +141,8 @@ npm run anvil:seed
 ```
 
 The seed command uses four default Anvil accounts and must run against an empty registry. The private key above is a publicly known Anvil key for **local testing only**. Never use it on a testnet or mainnet.
+
+<hr>
 
 ## Quick start
 
@@ -219,6 +225,8 @@ npm run dev
 ```
 
 Web documentation, issues, security reports, and all other contributions are coordinated through this `bit` repository.
+
+<hr>
 
 ## CLI reference
 
@@ -304,6 +312,8 @@ npm run compile
 ```
 
 The CLI end-to-end test guide is available in [English](tests/e2e/cli/README.md) and [Korean](tests/e2e/cli/README.ko.md).
+
+<hr>
 
 ## Project structure
 
