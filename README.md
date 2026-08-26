@@ -41,7 +41,7 @@ Bit is an experimental distributed version-control protocol built on IPFS and Et
 | **Git client** | Creates local repositories and commits; the `bit` CLI synchronizes protocol state. |
 | **IPFS** | Stores repository metadata, diffs, and manifests as content-addressed objects. |
 | **Ethereum** | Records Git commit-based branch heads, manifest/diff CID digests, and roles in `BitRegistry`. |
-| **Web explorer** | Browses protocol state and signs role, fork, and pull-request operations with MetaMask. |
+| **[Web explorer](https://github.com/opendasom/bit-w3)** | Browses protocol state and signs role, fork, and pull-request operations with MetaMask. |
 
 <p align="center">
   <img src="docs/assets/bit-architecture.png" alt="Bit architecture showing participants, the local Git and CLI environment, IPFS, Ethereum, and the Web3 client" width="100%" />
