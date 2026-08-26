@@ -79,7 +79,7 @@ func TestInitPropagatesCreateRepoFailure(t *testing.T) {
 func TestInitRejectsNilRepoIDWithoutError(t *testing.T) {
 	chainClient := &fakeChainClient{
 		createRepo: func(metadataCID string) (*big.Int, error) {
-			return nil, nil // defensive case: chain call "succeeded" but returned nothing usable
+			return nil, nil
 		},
 	}
 

@@ -10,17 +10,13 @@ import (
 	"github.com/opendasom/bit/internal/manifest"
 )
 
-// pendingCommit is a commit that has been downloaded and verified against
-// on-chain metadata but not yet applied to the local git repository.
 type pendingCommit struct {
 	record   chain.BranchCommitRecord
 	manifest *manifest.Manifest
 	diff     []byte
 }
 
-// Pull fetches commits recorded on-chain for the given branch that are
-// missing locally, verifies them against IPFS, and reconstructs them in the
-// local git repository.
+// Pull verifies and applies commits missing from the local branch.
 func Pull(chainClient ChainClient, ipfsClient IPFSClient, repoPath string, repoID *big.Int, branch string) error {
 	historyLen, err := chainClient.GetBranchHistoryLength(repoID, branch)
 	if err != nil {
