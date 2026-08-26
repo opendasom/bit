@@ -21,7 +21,7 @@
 
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
-  <a href="#demos">Demos</a> ·
+  <a href="#bit-cli-demos">Demos</a> ·
   <a href="https://github.com/opendasom/bit/wiki">Wiki</a> ·
   <a href="CONTRIBUTING.md">Contributing</a> ·
   <a href="SECURITY.md">Security</a>
@@ -34,7 +34,7 @@ Bit is an experimental distributed version-control protocol built on IPFS and Et
 
 <hr>
 
-## Architecture
+## Architecture 🏗️
 
 | Layer | Responsibility |
 |---|---|
@@ -49,7 +49,7 @@ Bit is an experimental distributed version-control protocol built on IPFS and Et
 
 See the [architecture and data model](https://github.com/opendasom/bit/wiki/Architecture-and-Data-Model) for integrity checks, on-chain records, roles, and protocol limits.
 
-### Web explorer
+### Web explorer 🌐
 
 Browse repositories and sign registry operations at the deployed [Bit Web3 explorer](https://bitweb.space/).
 
@@ -98,7 +98,7 @@ go build -o bit ./cmd/bit
 
 The complete local walkthrough starts Anvil and IPFS, deploys `BitRegistry`, creates a repository, pushes a commit, and verifies it by cloning. Follow the [Quick Start guide](https://github.com/opendasom/bit/wiki/Quick-Start).
 
-## Documentation
+## Documentation 📚
 
 | Need | Guide |
 |---|---|
@@ -110,7 +110,7 @@ The complete local walkthrough starts Anvil and IPFS, deploys `BitRegistry`, cre
 | Tests, ABI workflow, and code map | [Development Guide](https://github.com/opendasom/bit/wiki/Development-Guide) |
 | Setup and command failures | [Troubleshooting](https://github.com/opendasom/bit/wiki/Troubleshooting) |
 
-## Contributing and security
+## Contributing and security 🤝
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. All pull requests should target `develop` unless a maintainer requests otherwise. Report vulnerabilities through [SECURITY.md](SECURITY.md), not public issues.
 
