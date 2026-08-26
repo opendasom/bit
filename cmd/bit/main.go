@@ -1,6 +1,4 @@
-// Command bit is the entry point for the Bit CLI, a decentralized version
-// control tool that records commit history on-chain and stores content on
-// IPFS. See internal/cli for the available subcommands.
+// Command bit provides the Bit CLI.
 package main
 
 import (

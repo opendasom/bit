@@ -13,9 +13,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// initCmd implements `bit init`: it requires an existing .git repository,
-// uploads repo metadata to IPFS, registers a new repo on-chain, and writes
-// the resulting repo ID and connection settings to .bit/config.json.
 var initCmd = &cobra.Command{
 	Use:     "init",
 	Short:   "Initialize a new bit repository",
@@ -30,7 +27,6 @@ var initCmd = &cobra.Command{
 		repoDescription, _ := cmd.Flags().GetString("description")
 		defaultBranch, _ := cmd.Flags().GetString("branch")
 
-		// 1. Verify .git exists (git init must have been run already)
 		if _, err := os.Stat(".git"); os.IsNotExist(err) {
 			return fmt.Errorf(".git directory not found; run git init first")
 		}
@@ -69,7 +65,6 @@ var initCmd = &cobra.Command{
 		fmt.Printf("created chain repo (repoId: %s)\n", repoID.String())
 		fmt.Printf("registered repo metadata: %s\n", metadataCID)
 
-		// Write .bit/config.json
 		cfg := &config.Config{
 			RPCURL:          rpcURL,
 			ContractAddress: contractAddress,

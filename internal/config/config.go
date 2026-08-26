@@ -1,5 +1,4 @@
-// Package config reads and writes the per-repository settings stored at
-// .bit/config.json, including RPC/IPFS endpoints and registered remotes.
+// Package config reads and writes .bit/config.json.
 package config
 
 import (
@@ -12,30 +11,26 @@ import (
 const configDir = ".bit"
 const configFile = "config.json"
 
-// Remote holds the information for a remote registered via `bit remote add`.
 type Remote struct {
-	URL             string `json:"url"`                       // bit://<network>/<registry>/<repoId>
-	Network         string `json:"network,omitempty"`         // remote network label
-	ContractAddress string `json:"contractAddress,omitempty"` // remote registry address
-	RepoID          uint64 `json:"repoId"`                    // repo ID assigned by the chain
+	URL             string `json:"url"`
+	Network         string `json:"network,omitempty"`
+	ContractAddress string `json:"contractAddress,omitempty"`
+	RepoID          uint64 `json:"repoId"`
 }
 
-// Config is the per-project settings persisted at .bit/config.json.
 type Config struct {
-	RPCURL          string            `json:"rpcURL"`               // Ethereum node address
-	ContractAddress string            `json:"contractAddress"`      // BitRegistry contract address
-	PrivateKey      string            `json:"privateKey,omitempty"` // legacy only; never written by Save
-	IPFSURL         string            `json:"ipfsURL"`              // IPFS node address
-	RepoID          uint64            `json:"repoId"`               // repo ID assigned by the chain
-	Remotes         map[string]Remote `json:"remotes"`              // remote name -> Remote info
+	RPCURL          string            `json:"rpcURL"`
+	ContractAddress string            `json:"contractAddress"`
+	PrivateKey      string            `json:"privateKey,omitempty"` // Legacy only; Save clears it.
+	IPFSURL         string            `json:"ipfsURL"`
+	RepoID          uint64            `json:"repoId"`
+	Remotes         map[string]Remote `json:"remotes"`
 }
 
-// configPath returns the path to .bit/config.json under repoPath.
 func configPath(repoPath string) string {
 	return filepath.Join(repoPath, configDir, configFile)
 }
 
-// Load reads .bit/config.json and returns the resulting Config.
 func Load(repoPath string) (*Config, error) {
 	data, err := os.ReadFile(configPath(repoPath))
 	if err != nil {
@@ -51,8 +46,7 @@ func Load(repoPath string) (*Config, error) {
 	return &cfg, nil
 }
 
-// Save atomically writes Config to .bit/config.json, stripping any
-// legacy PrivateKey field so it is never persisted to disk.
+// Save never persists the legacy PrivateKey field.
 func Save(repoPath string, cfg *Config) error {
 	dir := filepath.Join(repoPath, configDir)
 	if err := os.MkdirAll(dir, 0700); err != nil {
@@ -84,8 +78,7 @@ func Save(repoPath string, cfg *Config) error {
 	return os.Rename(temporaryPath, configPath(repoPath))
 }
 
-// EnsureLocalExclude keeps Bit's repository-local state out of Git without
-// modifying the user's tracked .gitignore file.
+// EnsureLocalExclude avoids modifying the user's tracked .gitignore.
 func EnsureLocalExclude(repoPath string) error {
 	excludePath := filepath.Join(repoPath, ".git", "info", "exclude")
 	if err := os.MkdirAll(filepath.Dir(excludePath), 0755); err != nil {
@@ -113,7 +106,6 @@ func EnsureLocalExclude(repoPath string) error {
 	return err
 }
 
-// AddRemote adds a remote to the config and saves it.
 func AddRemote(repoPath, name string, remote Remote) error {
 	cfg, err := Load(repoPath)
 	if err != nil {
