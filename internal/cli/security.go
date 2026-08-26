@@ -9,7 +9,7 @@ import (
 	"github.com/opendasom/bit/internal/config"
 )
 
-// Environment variables are preferred to flags and legacy config to limit key exposure.
+// --key warns about shell exposure; legacy config is a fallback.
 func resolveSigningKey(flagValue string, cfg *config.Config) (string, error) {
 	if key := strings.TrimSpace(flagValue); key != "" {
 		fmt.Fprintln(os.Stderr, "warning: --key can be exposed through shell history; prefer BIT_PRIVATE_KEY")
