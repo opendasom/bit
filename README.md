@@ -21,7 +21,7 @@
 
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
-  <a href="#demos">Demos</a> ·
+  <a href="#bit-cli-demos">Demos</a> ·
   <a href="https://github.com/opendasom/bit/wiki">Wiki</a> ·
   <a href="CONTRIBUTING.md">Contributing</a> ·
   <a href="SECURITY.md">Security</a>
