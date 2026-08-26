@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import {BitRegistryTypes} from "./BitRegistryTypes.sol";
 
-/// @notice Every event the registry emits.
 abstract contract BitRegistryEvents is BitRegistryTypes {
     event RepoCreated(uint256 indexed repoId, address indexed owner, bytes metadataCID);
     event RepoForked(uint256 indexed repoId, uint256 indexed sourceRepoId, bytes32 indexed sourceBranch, address owner);
